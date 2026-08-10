@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# Nie einchecken: Geheimnisse und lokale Daten
+.env
+jarvis.toml
+*.db
+watchlist.json
+routine-state.json
+permissions.local.json
+logs/
