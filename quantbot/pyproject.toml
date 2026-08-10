@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantbot"
+version = "0.1.0"
+description = "Multi-factor trading bot: technicals, fundamentals, macro regime and news sentiment, with a walk-forward backtester and automated execution."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "PyYAML>=6.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+# Extra price providers. The bot runs without them (Alpha Vantage / CSV / synthetic
+# work over plain `requests`), but yfinance is the nicest source when reachable.
+providers = ["yfinance>=0.2.40", "pandas-datareader>=0.10"]
+# Charts in the HTML backtest report.
+report = ["matplotlib>=3.7"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+
+[project.scripts]
+quantbot = "quantbot.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

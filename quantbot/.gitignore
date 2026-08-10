@@ -1,0 +1,17 @@
+# Runtime artefacts — none of this belongs in version control.
+.cache/
+output/
+state/
+data/prices/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/

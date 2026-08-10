@@ -1,3 +1,6 @@
+> This repository holds two unrelated projects. For the systematic trading bot,
+> see [`quantbot/`](quantbot/README.md).
+
 # grafify setup
 
 Reproducible install of [grafify](https://grafify.shenoylab.com/) — the ggplot2
