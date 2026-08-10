@@ -1,3 +1,14 @@
+# general
+
+Zwei voneinander unabhängige Projekte in einem Repository.
+
+| Verzeichnis | Was es ist |
+| --- | --- |
+| [`jarvis/`](jarvis/) | Persönlicher KI-Assistent für die Kommandozeile — bedient Dateien, Postfach, Kursdaten und Websuche, mit Freigabeliste und Prüfprotokoll |
+| [`setup/`](setup/) | Reproduzierbares Installationsskript für das R-Paket grafify (siehe unten) |
+
+---
+
 # grafify setup
 
 Reproducible install of [grafify](https://grafify.shenoylab.com/) — the ggplot2

@@ -1,0 +1,188 @@
+# Jarvis — Konfiguration
+#
+# Hier stehen KEINE Geheimnisse. API-Schlüssel und Mail-Passwort gehören in
+# die .env-Datei daneben oder in die Umgebung.
+#
+# Nach jeder Änderung: `jarvis doctor`
+
+# ---------------------------------------------------------------------------
+# Modell
+# ---------------------------------------------------------------------------
+[model]
+name = "claude-opus-5"
+
+# Wie gründlich Jarvis nachdenkt und arbeitet.
+#   low     kurze, klar umrissene Aufgaben, schnellste Antwort
+#   medium  guter Kompromiss für den Alltag
+#   high    Standard — für alles, wo Genauigkeit zählt
+#   xhigh   lange Ketten aus Werkzeugaufrufen, schwierige Recherche
+#   max     nur, wenn Richtigkeit wichtiger ist als Kosten
+effort = "high"
+
+# Obergrenze pro Antwort. Denken UND Text zusammen. Zu klein heißt:
+# abgeschnittene Antworten.
+max_tokens = 32000
+
+# Zusammenfassung der Gedankengänge mitstreamen. Hilft beim Debuggen,
+# kostet aber Bildschirmplatz.
+show_thinking = false
+
+# Opus 5 kann eine Anfrage über Sicherheitsfilter ablehnen. Mit true
+# beantwortet in dem Fall automatisch ein Ersatzmodell — statt dass du
+# eine leere Antwort bekommst.
+fallbacks = true
+
+# Notbremse: so viele Werkzeugrunden darf eine einzelne Aufgabe brauchen.
+max_tool_rounds = 25
+
+# ---------------------------------------------------------------------------
+# Persönlichkeit
+# ---------------------------------------------------------------------------
+[agent]
+name = "Jarvis"
+language = "Deutsch"
+user_name = ""
+
+# Freitext, der an den Systemprompt gehängt wird. Der Ort für deine
+# Eigenheiten: "Duze mich.", "Rechnungen liegen in ~/Buchhaltung.",
+# "Fasse Mails von meinem Steuerberater nie zusammen, zeig sie mir ganz."
+persona = ""
+
+# ---------------------------------------------------------------------------
+# Freigabeliste
+# ---------------------------------------------------------------------------
+# allow = ohne Rückfrage, ask = einmal nachfragen, deny = gesperrt.
+#
+# Werkzeuge sind in drei Risikoklassen eingeteilt:
+#   read      lesen (Ordner ansehen, Mails lesen, Kurse abrufen)
+#   write     lokal verändern (Datei verschieben, Entwurf ablegen, Notiz merken)
+#   external  nach außen wirken (E-Mail versenden)
+[permissions]
+default_read = "allow"
+default_write = "ask"
+default_external = "ask"
+
+# Einzelne Werkzeuge können die Klassenregel überschreiben. Antwortest du im
+# Chat mit "immer" oder "nie mehr", landet das in permissions.local.json im
+# Datenverzeichnis — diese Datei hier bleibt unangetastet.
+[permissions.tools]
+organize_directory = "allow"   # Vorschau ist ohnehin der Standard
+remember = "allow"
+mail_flag = "allow"
+mail_draft = "allow"           # Entwurf schreiben ist harmlos, senden nicht
+mail_send = "ask"
+move_file = "ask"
+
+# ---------------------------------------------------------------------------
+# Dateien
+# ---------------------------------------------------------------------------
+# Jarvis kann ausschließlich innerhalb dieser Ordner arbeiten — auch nicht
+# über Umwege wie ".." oder Symlinks. Halte die Liste eng.
+[files]
+enabled = true
+roots = [
+    "~/Downloads",
+    "~/Dokumente",
+]
+
+# ---------------------------------------------------------------------------
+# Postfach (IMAP/SMTP)
+# ---------------------------------------------------------------------------
+# Voreingestellt für GMX. Andere Anbieter:
+#   Web.de   imap.web.de     / smtp.web.de
+#   Gmail    imap.gmail.com  / smtp.gmail.com   (App-Passwort nötig)
+#   Outlook  outlook.office365.com / smtp.office365.com
+#
+# Bei GMX muss "POP3/IMAP-Abruf" in den Einstellungen freigeschaltet sein.
+# Nutze wenn möglich ein eigenes App-Passwort, nicht dein Hauptpasswort.
+[mail]
+enabled = false
+imap_host = "imap.gmx.net"
+imap_port = 993
+smtp_host = "mail.gmx.net"
+smtp_port = 587
+user = "dein.name@gmx.net"
+inbox = "INBOX"
+drafts = "Entwürfe"            # bei GMX deutsch; mit `mail_folders` prüfen
+password_env = "JARVIS_MAIL_PASSWORD"
+signature = ""
+
+# ---------------------------------------------------------------------------
+# Finanzmärkte
+# ---------------------------------------------------------------------------
+# Jarvis beobachtet und rechnet. Er handelt nicht und kann es auch nicht.
+[markets]
+enabled = true
+currency_hint = "EUR"
+
+# Startbestückung der Watchlist. Sie wird beim ersten Lauf nach
+# watchlist.json übernommen; danach ist die JSON-Datei maßgeblich und
+# Jarvis kann sie selbst pflegen.
+[[markets.watchlist]]
+symbol = "^GDAXI"
+label = "DAX"
+
+[[markets.watchlist]]
+symbol = "^GSPC"
+label = "S&P 500"
+
+[[markets.watchlist]]
+symbol = "EURUSD=X"
+label = "Euro/Dollar"
+
+# ---------------------------------------------------------------------------
+# Recherche
+# ---------------------------------------------------------------------------
+# Websuche und Seitenabruf laufen auf Anthropics Servern, nicht auf deinem
+# Rechner. Es gibt dafür nichts einzurichten und keinen zusätzlichen Schlüssel.
+[research]
+enabled = true
+max_searches = 8
+blocked_domains = []
+
+# ---------------------------------------------------------------------------
+# Routinen
+# ---------------------------------------------------------------------------
+# Zeitpläne: "daily HH:MM", "weekdays HH:MM", "weekly Mon HH:MM",
+#            "every 30m", "every 4h"
+#
+# Ausgeführt wird nichts von allein — `jarvis routines run` prüft, was fällig
+# ist. Für echten Dauerbetrieb aus cron/systemd/launchd aufrufen, siehe README.
+#
+# Achtung: Routinen laufen unbeaufsichtigt. Werkzeuge auf "ask" werden dabei
+# abgelehnt, weil niemand zum Bestätigen da ist.
+
+[[routines]]
+name = "briefing"
+schedule = "weekdays 07:30"
+enabled = true
+prompt = """
+Erstelle mein Morgenbriefing:
+1. Watchlist prüfen — was hat sich bewegt, welche Schwellwerte wurden erreicht?
+2. Ungelesene Mails der letzten 24 Stunden zusammenfassen, sortiert danach,
+   was heute eine Antwort braucht.
+3. Nachrichtenlage zu den Werten auf der Watchlist, mit Quelle.
+Kurz halten — zum Lesen im Stehen.
+"""
+# Ergebnis zusätzlich per Mail schicken (braucht [mail] enabled = true):
+# email_to = "dein.name@gmx.net"
+
+[[routines]]
+name = "kursalarm"
+schedule = "every 2h"
+enabled = false
+prompt = """
+Prüfe die Watchlist. Melde dich NUR, wenn ein Schwellwert erreicht wurde
+oder sich ein Wert um mehr als 3 Prozent bewegt hat. Sonst antworte
+ausschließlich mit "nichts zu melden".
+"""
+
+[[routines]]
+name = "downloads-aufraeumen"
+schedule = "weekly Fri 18:00"
+enabled = false
+prompt = """
+Sieh dir ~/Downloads an: was liegt dort, wie viel Platz belegt es, gibt es
+Duplikate? Zeig mir einen Sortiervorschlag nach Dateityp als Vorschau.
+Verschiebe nichts.
+"""
