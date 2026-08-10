@@ -159,6 +159,23 @@ def run_walk_forward(
             f"have {len(data.close.index)}"
         )
 
+    # Indicator panels only depend on these config sections. When the grid leaves
+    # them alone — the common case — the panels can be computed once and shared
+    # across every trial instead of being rebuilt folds x combinations times.
+    prepare_sensitive = {"features", "regime", "universe", "data"}
+    reusable = not any(path.split(".")[0] in prepare_sensitive for path in grid)
+
+    template: Optional[object] = None
+    if reusable:
+        template = build_strategy(strategy_name, cfg)
+        template.prepare(data)
+        log.info("feature panels prepared once and shared across all trials")
+
+    def make_strategy(trial_cfg: Config):
+        return template.with_config(trial_cfg) if template is not None else build_strategy(
+            strategy_name, trial_cfg
+        )
+
     log.info(
         "walk-forward: %d folds x %d parameter combinations", len(windows), len(combinations)
     )
@@ -177,11 +194,12 @@ def run_walk_forward(
                 _set_by_path(trial_cfg, path, value)
             try:
                 engine = BacktestEngine(trial_cfg)
-                strategy = build_strategy(strategy_name, trial_cfg)
+                strategy = make_strategy(trial_cfg)
                 result = engine.run(
                     strategy, data,
                     start=train_index[0], end=train_index[-1],
                     label=f"fold{i}-train",
+                    prepare=template is None,
                 )
             except Exception as exc:
                 log.warning("fold %d, params %s failed on the training window: %s", i, params, exc)
@@ -203,11 +221,12 @@ def run_walk_forward(
         for path, value in best_params.items():
             _set_by_path(test_cfg, path, value)
         engine = BacktestEngine(test_cfg)
-        strategy = build_strategy(strategy_name, test_cfg)
+        strategy = make_strategy(test_cfg)
         test_result = engine.run(
             strategy, data,
             start=test_index[0], end=test_index[-1],
             label=f"fold{i}-test",
+            prepare=template is None,
         )
 
         folds.append(
@@ -242,10 +261,26 @@ def run_walk_forward(
         n_trials=len(combinations) * len(folds),
     )
 
+    # Trading statistics have to be aggregated from the folds. Each fold ran on
+    # its own capital base, so the stitched equity curve cannot be used to
+    # normalise their notionals — but each fold's turnover is already annualised,
+    # so a length-weighted average of those is the honest figure. Leaving them at
+    # zero would advertise a cost-free strategy that traded 13 times over.
+    total_days = sum(len(f.returns) for f in folds) or 1
+    oos_metrics.turnover = sum(
+        (f.test_metrics.turnover if f.test_metrics else 0.0) * len(f.returns) for f in folds
+    ) / total_days
+    oos_metrics.cost_drag = sum(
+        (f.test_metrics.cost_drag if f.test_metrics else 0.0) * len(f.returns) for f in folds
+    ) / total_days
+    oos_metrics.trades = sum(f.test_metrics.trades if f.test_metrics else 0 for f in folds)
+
     in_sample_metrics = None
     if also_run_in_sample:
         engine = BacktestEngine(cfg)
-        full = engine.run(build_strategy(strategy_name, cfg), data, label="in-sample")
+        full = engine.run(
+            make_strategy(cfg), data, label="in-sample", prepare=template is None
+        )
         in_sample_metrics = full.metrics
 
     return WalkForwardResult(

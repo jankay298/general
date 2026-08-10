@@ -194,6 +194,15 @@ Provider, nicht am Symbol); ein leeres Ergebnis überspringt nur das Symbol.
 Alles wird mit TTL auf Platte gecacht, damit ein zweiter Backtest nicht das
 Tageskontingent verbrennt.
 
+**Ein Fallstrick, der abgesichert ist.** Der `synthetic`-Provider antwortet für
+*jedes* Tickersymbol. Ein Lauf, dessen echte Provider alle blockiert sind, fällt
+also auf ihn zurück und produziert einen völlig normal aussehenden Backtest über
+einen erfundenen Markt. Deshalb wird das laut protokolliert und im HTML-Report
+als rotes Banner ausgewiesen — und die Herkunft wird neben den Kursdaten
+mitgecacht, damit auch der zweite Lauf sie noch kennt. Wer das hart haben will,
+entfernt `synthetic` aus `data.price_providers`; dann sind fehlende Daten ein
+Fehler statt einer Erfindung.
+
 **Nicht abgedeckte Verzerrung: Survivorship Bias.** Ein heute
 zusammengestelltes Universum enthält per Konstruktion die Überlebenden. Für
 belastbare Ergebnisse braucht es historische Indexzusammensetzungen; die liefert

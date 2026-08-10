@@ -64,6 +64,9 @@ class CompositeStrategy(Strategy):
         self.tech = None
         self.unavailable: List[str] = []
         self._last_vol_scale: Optional[float] = None
+        self._returns: Optional[pd.DataFrame] = None
+        self._history_count: Optional[pd.DataFrame] = None
+        self._recently_traded: Optional[pd.DataFrame] = None
 
     # ------------------------------------------------------------------ setup
 
@@ -94,6 +97,14 @@ class CompositeStrategy(Strategy):
         self.regime = classify_regime(
             data.macro, cfg.regime, benchmark=data.benchmark, index=data.close.index
         )
+
+        # Precomputed once. Deriving these per rebalance date instead — the
+        # obvious way to write it — recomputes an O(n) reduction over the whole
+        # prefix on every call, making a backtest quadratic in its own length.
+        # All three are causal: row t is a function of rows <= t only.
+        self._returns = data.close.pct_change(fill_method=None)
+        self._history_count = data.close.notna().cumsum()
+        self._recently_traded = data.traded.rolling(5, min_periods=1).max().astype(bool)
 
         configured = set().union(*(set(w) for w in cfg.regime.factor_weights.values()))
         self.unavailable = sorted(configured - set(self.scores))
@@ -227,15 +238,15 @@ class CompositeStrategy(Strategy):
         data = self.data
         cfg = self.cfg
 
-        history = data.close.loc[:date]
-        if history.empty:
+        window = data.close.loc[:date]
+        if window.empty:
             return pd.Index([])
 
-        enough_history = history.notna().sum() >= cfg.data.min_history_bars
-        has_price = history.iloc[-1].notna()
+        enough_history = self._history_count.loc[date] >= cfg.data.min_history_bars
+        has_price = window.iloc[-1].notna()
         # Forward-filled holiday prices are fine for valuation but not for a fresh
         # trade decision — require a genuine print in the last week.
-        recently_traded = data.traded.loc[:date].tail(5).any()
+        recently_traded = self._recently_traded.loc[date]
 
         mask = enough_history & has_price & recently_traded
 
@@ -374,7 +385,9 @@ class CompositeStrategy(Strategy):
             weights.loc[sized.index] = -sized * short_gross
             diagnostics.selected_short = list(sized.index)
 
-        returns = self.data.close.loc[:date].pct_change(fill_method=None)
+        # Only the covariance lookback is needed, so hand over that slice rather
+        # than the whole prefix.
+        returns = self._returns.loc[:date].tail(cfg.risk.vol_lookback * 2)
         weights, scale = scale_to_target_vol(
             weights,
             returns,

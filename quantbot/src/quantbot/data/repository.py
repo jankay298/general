@@ -56,6 +56,7 @@ class PriceRepository:
 
     def fetch(self, symbol: str, start: str, end: Optional[str]) -> Optional[pd.DataFrame]:
         """Bars for one symbol from the first provider that can serve them."""
+        served_by: Dict[str, str] = {}
 
         def loader() -> Optional[pd.DataFrame]:
             for provider in self.providers:
@@ -85,6 +86,7 @@ class PriceRepository:
                         provider.name,
                         symbol,
                     )
+                served_by["provider"] = provider.name
                 self.sources[symbol] = provider.name
                 log.debug("%s: %d bars from %s", symbol, len(frame), provider.name)
                 return frame
@@ -92,8 +94,17 @@ class PriceRepository:
 
         key = f"{symbol}-{start}-{end or 'latest'}"
         frame = self.cache.frame("prices", key, loader)
-        if frame is not None and symbol not in self.sources:
-            self.sources[symbol] = "cache"
+        if frame is None:
+            return None
+
+        # Provenance has to survive the cache. Without the sidecar, the second run
+        # of a synthetic fallback reports its source as "cache" and the generated
+        # prices become indistinguishable from real market data.
+        if served_by:
+            self.cache.json("prices_src", key, lambda: served_by)
+        else:
+            record = self.cache.json("prices_src", key, lambda: None)
+            self.sources[symbol] = (record or {}).get("provider", "cache")
         return frame
 
     def fetch_many(
@@ -146,6 +157,23 @@ class MarketData:
     @property
     def symbols(self) -> List[str]:
         return list(self.close.columns)
+
+    @property
+    def simulated_symbols(self) -> List[str]:
+        """Tradable symbols whose prices came from the generator, not a market.
+
+        Restricted to the traded universe: the benchmark is fetched through the
+        same repository but is never held, so counting it would report more
+        simulated symbols than the universe contains.
+        """
+        tradable = set(self.close.columns)
+        return sorted(
+            s for s, src in self.sources.items() if src == "synthetic" and s in tradable
+        )
+
+    @property
+    def is_simulated(self) -> bool:
+        return bool(self.simulated_symbols)
 
     @property
     def dates(self) -> pd.DatetimeIndex:
@@ -222,6 +250,20 @@ def load_market_data(
 
     log.info("fetching prices for %d symbols", len(symbols))
     frames = repo.fetch_many(symbols, cfg.data.start, cfg.data.end)
+
+    # The synthetic provider answers for *any* ticker, so a run whose real
+    # providers are all blocked falls through to it and produces a backtest that
+    # looks entirely normal and means nothing. Say so once, loudly.
+    simulated = sorted(s for s, src in repo.sources.items() if src == "synthetic")
+    if simulated:
+        log.warning(
+            "%d of %d symbols are SIMULATED, not market data (%s%s). Results from "
+            "this run describe a generated market. Remove 'synthetic' from "
+            "data.price_providers to make missing data an error instead.",
+            len(simulated), len(frames),
+            ", ".join(simulated[:6]),
+            ", ..." if len(simulated) > 6 else "",
+        )
 
     index = pd.DatetimeIndex(sorted(set().union(*(f.index for f in frames.values()))))
     panels = {}

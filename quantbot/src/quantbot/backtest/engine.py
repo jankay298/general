@@ -244,6 +244,7 @@ class BacktestEngine:
                 "rebalance": cfg.backtest.rebalance,
                 "execution_lag_bars": lag,
                 "total_costs": float(portfolio.total_costs()),
+                "simulated_symbols": len(data.simulated_symbols),
             },
         )
         log.info(

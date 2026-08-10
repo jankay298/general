@@ -223,3 +223,30 @@ def test_survey_data_is_lagged_more_than_market_data():
     assert release_lag_days("GDPC1") >= 25
     # An unknown series gets a conservative default rather than zero.
     assert release_lag_days("SOMETHING_NEW") >= 7
+
+
+def test_provenance_survives_the_cache(tmp_path):
+    """A cached synthetic run must still be identifiable as synthetic."""
+    from quantbot.data.repository import PriceRepository
+    from quantbot.utils.cache import Cache
+
+    cfg = Config()
+    cfg.universe.symbols = ["AAA", "BBB"]
+    cfg.data.price_providers = ["synthetic"]
+    cfg.data.start = "2020-01-01"
+    cfg.data.end = "2022-01-01"
+    cfg.data.min_history_bars = 100
+
+    cache = Cache(tmp_path / "cache", ttl_hours=999, enabled=True)
+
+    first = PriceRepository(cfg, cache)
+    first.fetch_many(cfg.universe.symbols, cfg.data.start, cfg.data.end)
+    assert set(first.sources.values()) == {"synthetic"}
+
+    # A second repository sees only the cache — and must still say "synthetic".
+    second = PriceRepository(cfg, cache)
+    second.fetch_many(cfg.universe.symbols, cfg.data.start, cfg.data.end)
+    assert set(second.sources.values()) == {"synthetic"}, (
+        "the cache erased the provenance; generated prices would be reported as "
+        "real market data on every run after the first"
+    )

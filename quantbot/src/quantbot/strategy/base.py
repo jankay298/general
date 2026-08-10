@@ -15,6 +15,7 @@ other than what actually trades, which is the most common way a strategy that
 from __future__ import annotations
 
 import abc
+import copy
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -97,6 +98,25 @@ class Strategy(abc.ABC):
         # day at or before each period end — calendars have holidays, offsets don't.
         marks = pd.Series(index, index=index).resample(rule).last().dropna()
         return pd.DatetimeIndex(sorted(set(marks.to_numpy())))
+
+    def with_config(self, cfg: Config) -> "Strategy":
+        """A copy of this strategy running under a different config.
+
+        Precomputed panels are *shared*, not recomputed. That is safe because
+        ``prepare`` only reads price data, and its outputs are never mutated
+        afterwards — but it is only valid when the new config leaves the
+        prepare-time inputs (features, regime, universe, data) untouched. The
+        walk-forward search relies on this: without it, a 9-point grid over 12
+        folds recomputes the same indicator panels 108 times.
+        """
+        self.require_prepared()
+        clone = copy.copy(self)
+        clone.cfg = cfg
+        clone.last_diagnostics = None
+        # Any per-run state must start fresh, or one trial leaks into the next.
+        if hasattr(clone, "_last_vol_scale"):
+            clone._last_vol_scale = None
+        return clone
 
     def require_prepared(self) -> None:
         if not self._prepared:

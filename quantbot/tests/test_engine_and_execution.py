@@ -326,3 +326,95 @@ def test_corrupt_paper_state_is_not_silently_overwritten(tmp_path):
         PaperBroker(state, initial_cash=10_000.0)
     # The damaged file must still be there for the operator to inspect.
     assert state.read_text(encoding="utf-8").startswith("{not valid")
+
+
+# --------------------------------------------------------------------------- #
+# Walk-forward
+# --------------------------------------------------------------------------- #
+
+
+def test_sharing_prepared_panels_matches_full_repreparation(small_cfg, small_market):
+    """The walk-forward speedup must not change a single number."""
+    other = copy.deepcopy(small_cfg)
+    other.risk.target_vol = 0.20
+
+    fresh = build_strategy("composite", other)
+    fresh.prepare(small_market)
+
+    template = build_strategy("composite", small_cfg)
+    template.prepare(small_market)
+    shared = template.with_config(other)
+
+    for date in small_market.close.index[300::60]:
+        pd.testing.assert_series_equal(
+            fresh.target_weights(date),
+            shared.target_weights(date),
+            check_exact=False, rtol=1e-12,
+            obj=f"shared panels changed the weights on {date.date()}",
+        )
+
+
+def test_with_config_does_not_leak_state_between_trials(small_cfg, small_market):
+    template = build_strategy("composite", small_cfg)
+    template.prepare(small_market)
+
+    first = template.with_config(small_cfg)
+    first.target_weights(small_market.close.index[400])
+    assert first._last_vol_scale is not None
+
+    second = template.with_config(small_cfg)
+    assert second._last_vol_scale is None, "per-run state leaked into the next trial"
+    assert template._last_vol_scale is None
+
+
+def test_walk_forward_reports_out_of_sample_results(small_cfg, small_market):
+    from quantbot.backtest.walkforward import run_walk_forward
+
+    cfg = copy.deepcopy(small_cfg)
+    cfg.backtest.rebalance = "BME"
+    cfg.backtest.wf_train_days = 400
+    cfg.backtest.wf_test_days = 150
+    cfg.backtest.wf_step_days = 150
+
+    result = run_walk_forward(
+        cfg, small_market, grid={"risk.target_vol": (0.10, 0.15)}, also_run_in_sample=True
+    )
+
+    assert len(result.folds) >= 2
+    assert not result.oos_returns.empty
+    assert result.n_trials == 2
+    assert result.in_sample_metrics is not None
+    # Every fold must have traded a window strictly after the one it was fitted on.
+    for fold in result.folds:
+        assert fold.test_start > fold.train_end
+    # The stitched curve must not reuse a bar twice.
+    assert not result.oos_returns.index.duplicated().any()
+
+
+def test_walk_forward_rejects_too_little_history(small_cfg, small_market):
+    from quantbot.backtest.walkforward import run_walk_forward
+
+    cfg = copy.deepcopy(small_cfg)
+    cfg.backtest.wf_train_days = 100_000
+    with pytest.raises(ValueError, match="not enough history"):
+        run_walk_forward(cfg, small_market, grid={})
+
+
+def test_walk_forward_aggregates_trading_statistics(small_cfg, small_market):
+    """The out-of-sample summary must not claim a cost-free, trade-free strategy."""
+    from quantbot.backtest.walkforward import run_walk_forward
+
+    cfg = copy.deepcopy(small_cfg)
+    cfg.backtest.rebalance = "BME"
+    cfg.backtest.wf_train_days = 400
+    cfg.backtest.wf_test_days = 150
+    cfg.backtest.wf_step_days = 150
+
+    result = run_walk_forward(cfg, small_market, grid={}, also_run_in_sample=False)
+
+    assert result.oos_metrics.trades > 0
+    assert result.oos_metrics.trades == sum(f.test_metrics.trades for f in result.folds)
+    assert result.oos_metrics.turnover > 0
+    # The aggregate must sit inside the range of the folds it came from.
+    fold_turnovers = [f.test_metrics.turnover for f in result.folds]
+    assert min(fold_turnovers) <= result.oos_metrics.turnover <= max(fold_turnovers)

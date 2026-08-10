@@ -33,6 +33,20 @@ _PALETTE = ["#2f6f9f", "#c06014", "#4a8c5c", "#8a5fa8", "#a03c3c", "#7a7a7a"]
 # --------------------------------------------------------------------------- #
 
 
+def _epoch_ns(index: pd.Index) -> np.ndarray:
+    """Datetime index as nanoseconds since the epoch, as float.
+
+    Going through an explicit ``datetime64[ns]`` cast is the whole point: pandas
+    may hand back a ``datetime64[us]`` index, whose ``astype("int64")`` is in
+    *microseconds*, while ``Timestamp.value`` is always in nanoseconds. Mixing the
+    two silently scales the x-axis by a thousand and pushes every point off the
+    canvas — the chart still renders its axes, so it looks like a data problem.
+    """
+    return (
+        pd.DatetimeIndex(index).to_numpy(dtype="datetime64[ns]").astype("int64").astype(float)
+    )
+
+
 def _scale(values: np.ndarray, lo: float, hi: float, size: float, invert: bool = False):
     span = hi - lo
     if span <= 0 or not np.isfinite(span):
@@ -78,9 +92,12 @@ def _line_chart(
     margin = (hi - lo) * 0.06
     lo, hi = lo - margin, hi + margin
 
-    first = next(iter(series_map.values()))
-    index = first.index
-    x_lo, x_hi = index[0].value, index[-1].value
+    # Span every series, not just the first — they can cover different ranges.
+    epochs = [_epoch_ns(s.index) for s in series_map.values()]
+    x_lo = float(min(e[0] for e in epochs))
+    x_hi = float(max(e[-1] for e in epochs))
+    if x_hi <= x_lo:
+        x_hi = x_lo + 1.0
 
     parts: List[str] = [
         f'<svg viewBox="0 0 {width} {height}" class="chart" role="img" '
@@ -105,11 +122,9 @@ def _line_chart(
         y0 = pad_t + plot_h * (hi - transform(np.array([0.0]))[0]) / (hi - lo)
         parts.append(f'<line x1="{pad_l}" y1="{y0:.1f}" x2="{width - pad_r}" y2="{y0:.1f}" class="zero"/>')
 
-    for i, (name, series) in enumerate(series_map.items()):
+    for i, ((name, series), epoch) in enumerate(zip(series_map.items(), epochs)):
         colour = _PALETTE[i % len(_PALETTE)]
-        xs = pad_l + _scale(
-            series.index.astype("int64").to_numpy(dtype=float), x_lo, x_hi, plot_w
-        )
+        xs = pad_l + _scale(epoch, x_lo, x_hi, plot_w)
         ys = pad_t + _scale(transform(series.to_numpy(dtype=float)), lo, hi, plot_h, invert=True)
         # Thin the path: a decade of daily bars is ~2500 points and the eye cannot
         # use them, but the file size is real.
@@ -251,6 +266,8 @@ tbody th,thead th:first-child{text-align:left;font-weight:500}
 .note{background:var(--card);border-left:3px solid var(--accent);padding:10px 14px;
 margin:16px 0;font-size:13.5px;color:var(--fg);border-radius:0 6px 6px 0}
 .note strong{color:var(--accent)}
+.note.warn{border-left-color:#c0562a}
+.note.warn strong{color:#c0562a}
 code{background:rgba(127,127,127,.14);padding:1px 5px;border-radius:4px;font-size:12.5px}
 """
 
@@ -345,6 +362,16 @@ def render_html(
         )
         sections.append(f"<h2>Drawdown guard</h2><div class='card'><ul>{items}</ul></div>")
 
+    simulated = int(meta.get("simulated_symbols", 0) or 0)
+    simulated_banner = (
+        f"<div class='note warn'><strong>Simulated data.</strong> "
+        f"{simulated} of {len(meta.get('symbols', []))} symbols in this run came from "
+        f"the synthetic generator, not from a market. Every number below describes a "
+        f"market that does not exist.</div>"
+        if simulated
+        else ""
+    )
+
     caveats = (
         "<div class='note'><strong>Read this before believing any number above.</strong> "
         "A backtest is a lower bound on how wrong you can be, not a forecast. This one "
@@ -364,6 +391,7 @@ def render_html(
    &middot; rebalance {html.escape(str(meta.get('rebalance', '')))}
    &middot; execution lag {meta.get('execution_lag_bars', 1)} bar(s)
    &middot; initial capital {meta.get('initial_capital', 0):,.0f}</p>
+  {simulated_banner}
   {caveats}
   {''.join(sections)}
 </div>"""
