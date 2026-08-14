@@ -1,0 +1,627 @@
+<title>Stundensatz-Rechner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Kostenloser Rechner: Welchen Stundensatz brauchst du als Selbstständiger wirklich, damit am Ende genug übrig bleibt?">
+
+<style>
+/* ---------- Tokens: light (bare :root = complete palette) ---------- */
+:root {
+  --paper:      #EFF2F1;
+  --surface:    #FBFCFC;
+  --surface-2:  #E7ECEA;
+  --ink:        #15242A;
+  --ink-soft:   #3A4C52;
+  --muted:      #62757A;   /* grey biased toward the teal accent */
+  --rule:       #C9D3D1;
+  --rule-soft:  #DDE4E2;
+  --accent:     #0D6B61;
+  --accent-ink: #FFFFFF;
+  --accent-wash:#DCEBE8;
+  --good:       #226E45;
+  --warn:       #A85715;
+  --bad:        #A32319;
+  --good-wash:  #DCEDE2;
+  --warn-wash:  #F6E7D6;
+  --bad-wash:   #F3DEDB;
+  --focus:      #0D6B61;
+
+  --f-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --f-num: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --step--1: clamp(0.76rem, 0.74rem + 0.1vw, 0.82rem);
+  --step-0:  clamp(0.95rem, 0.92rem + 0.14vw, 1.02rem);
+  --step-1:  clamp(1.12rem, 1.05rem + 0.34vw, 1.3rem);
+  --step-2:  clamp(1.4rem, 1.26rem + 0.7vw, 1.85rem);
+  --step-3:  clamp(2.1rem, 1.6rem + 2.4vw, 3.4rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #0E181B;
+    --surface:    #15242A;
+    --surface-2:  #1D3037;
+    --ink:        #E4EDEB;
+    --ink-soft:   #BCCCC9;
+    --muted:      #8CA1A3;
+    --rule:       #2C444B;
+    --rule-soft:  #223740;
+    --accent:     #46B7A7;
+    --accent-ink: #06201D;
+    --accent-wash:#173B39;
+    --good:       #6FC28C;
+    --warn:       #E0A05C;
+    --bad:        #E58278;
+    --good-wash:  #17351F;
+    --warn-wash:  #38290F;
+    --bad-wash:   #3B1E1C;
+    --focus:      #46B7A7;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:      #0E181B;
+  --surface:    #15242A;
+  --surface-2:  #1D3037;
+  --ink:        #E4EDEB;
+  --ink-soft:   #BCCCC9;
+  --muted:      #8CA1A3;
+  --rule:       #2C444B;
+  --rule-soft:  #223740;
+  --accent:     #46B7A7;
+  --accent-ink: #06201D;
+  --accent-wash:#173B39;
+  --good:       #6FC28C;
+  --warn:       #E0A05C;
+  --bad:        #E58278;
+  --good-wash:  #17351F;
+  --warn-wash:  #38290F;
+  --bad-wash:   #3B1E1C;
+  --focus:      #46B7A7;
+}
+
+/* ---------- Base ---------- */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: var(--step-0);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { margin: 0; text-wrap: balance; line-height: 1.15; font-weight: 650; letter-spacing: -0.015em; }
+
+.wrap { max-width: 1120px; margin-inline: auto; padding: 0 clamp(1rem, 4vw, 2.5rem); }
+
+.eyebrow {
+  font-size: var(--step--1);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ---------- Masthead ---------- */
+.masthead { border-bottom: 1px solid var(--rule); background: var(--surface); }
+.masthead .wrap {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 0.5rem 1.25rem; padding-block: 1.15rem;
+}
+.mark { font-family: var(--f-num); font-weight: 700; font-size: var(--step-0); letter-spacing: -0.02em; }
+.mark span { color: var(--accent); }
+.masthead p { margin: 0; color: var(--muted); font-size: var(--step--1); }
+
+/* ---------- Intro ---------- */
+.intro { padding-block: clamp(2.25rem, 6vw, 4rem) clamp(1.5rem, 4vw, 2.5rem); }
+.intro h1 { font-size: var(--step-3); max-width: 16ch; }
+.intro .lede {
+  margin: 1.1rem 0 0; max-width: 62ch; font-size: var(--step-1);
+  color: var(--ink-soft); line-height: 1.5;
+}
+
+/* ---------- Calculator layout ---------- */
+.calc {
+  display: grid; gap: clamp(1.25rem, 3vw, 2.25rem);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: start;
+  padding-bottom: clamp(2rem, 5vw, 3.5rem);
+}
+@media (max-width: 900px) { .calc { grid-template-columns: minmax(0, 1fr); } }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+/* ---------- Form ---------- */
+form { margin: 0; }
+fieldset { margin: 0; padding: 1.1rem clamp(1rem, 2.5vw, 1.5rem) 1.35rem; border: 0; border-top: 1px solid var(--rule-soft); }
+fieldset:first-of-type { border-top: 0; }
+legend { padding: 0; margin-bottom: 0.9rem; }
+legend b { display: block; font-size: var(--step-0); font-weight: 650; }
+legend small { display: block; color: var(--muted); font-size: var(--step--1); margin-top: 0.15rem; }
+
+.rows { display: grid; gap: 0.7rem; }
+
+.row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 8.5rem;
+  gap: 0.5rem 1rem; align-items: center;
+}
+.row label { font-size: var(--step--1); color: var(--ink-soft); }
+.row label i { display: block; font-style: normal; color: var(--muted); font-size: 0.92em; }
+
+.field { display: flex; align-items: center; gap: 0.35rem; }
+.field input[type="number"] {
+  width: 100%; min-width: 0;
+  font-family: var(--f-num); font-size: var(--step-0); font-variant-numeric: tabular-nums;
+  color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 2px;
+  padding: 0.42rem 0.5rem; text-align: right;
+}
+.field .unit { font-family: var(--f-num); font-size: var(--step--1); color: var(--muted); width: 1.4rem; }
+
+input:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 2px;
+}
+
+/* Productivity slider — the field that decides everything */
+.quota { grid-template-columns: minmax(0, 1fr); gap: 0.55rem; }
+.quota .head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.quota .val { font-family: var(--f-num); font-size: var(--step-1); font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.quota input[type="range"] { width: 100%; accent-color: var(--accent); }
+.quota .scale { display: flex; justify-content: space-between; font-family: var(--f-num); font-size: 0.72rem; color: var(--muted); }
+
+/* ---------- Result ---------- */
+.result { position: sticky; top: 1rem; }
+@media (max-width: 900px) { .result { position: static; } }
+
+.result .head { padding: 1.1rem clamp(1rem, 2.5vw, 1.5rem) 0; }
+.verdict { padding: 0.85rem clamp(1rem, 2.5vw, 1.5rem) 1.25rem; }
+.verdict .rule-top { border-top: 1px solid var(--rule); }
+
+.figure {
+  display: flex; align-items: baseline; justify-content: center; gap: 0.3rem;
+  font-family: var(--f-num); font-variant-numeric: tabular-nums;
+  border-block: 2px solid var(--ink);
+  padding-block: 0.7rem; margin-block: 0.75rem;
+}
+.figure b { font-size: clamp(2.6rem, 9vw, 3.6rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+.figure span { font-size: var(--step-1); color: var(--muted); }
+
+.figure-cap { text-align: center; font-size: var(--step--1); color: var(--muted); }
+
+.breakdown { display: grid; gap: 0; margin-top: 1.1rem; }
+.breakdown div {
+  display: flex; justify-content: space-between; gap: 1rem;
+  padding: 0.42rem 0; border-top: 1px solid var(--rule-soft);
+  font-size: var(--step--1);
+}
+.breakdown div:first-child { border-top: 0; }
+.breakdown dt, .breakdown span:first-child { color: var(--muted); }
+.breakdown b { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.status {
+  margin: 1.1rem 0 0; padding: 0.8rem 0.9rem; border-radius: 2px;
+  border-left: 3px solid currentColor; font-size: var(--step--1);
+}
+.status b { display: block; font-size: var(--step-0); margin-bottom: 0.15rem; }
+.status p { margin: 0; color: var(--ink-soft); }
+.status.is-good { color: var(--good); background: var(--good-wash); }
+.status.is-warn { color: var(--warn); background: var(--warn-wash); }
+.status.is-bad  { color: var(--bad);  background: var(--bad-wash); }
+
+/* ---------- Sensitivity ---------- */
+.sens { padding-bottom: clamp(2.5rem, 6vw, 4rem); }
+.sens h2 { font-size: var(--step-2); max-width: 22ch; margin-bottom: 0.6rem; }
+.sens .lede { margin: 0 0 1.4rem; max-width: 62ch; color: var(--ink-soft); }
+
+.table-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 3px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 34rem; }
+caption { text-align: left; padding: 0.9rem 1rem 0; font-size: var(--step--1); color: var(--muted); }
+th, td { padding: 0.6rem 1rem; text-align: right; border-top: 1px solid var(--rule-soft); }
+th:first-child, td:first-child { text-align: left; }
+thead th {
+  border-top: 0; border-bottom: 1px solid var(--rule);
+  font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--muted); font-weight: 600;
+}
+tbody td { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+tbody tr.is-current { background: var(--accent-wash); }
+tbody tr.is-current td { color: var(--ink); font-weight: 700; }
+tbody tr.is-current td:first-child::before {
+  content: "▸"; color: var(--accent); margin-right: 0.4rem;
+}
+
+/* ---------- Method ---------- */
+.method { padding-bottom: clamp(2.5rem, 6vw, 4rem); }
+.method h2 { font-size: var(--step-2); margin-bottom: 1.1rem; }
+.method ol { margin: 0; padding-left: 1.3rem; display: grid; gap: 0.55rem; max-width: 68ch; color: var(--ink-soft); }
+.method code { font-family: var(--f-num); font-size: 0.92em; background: var(--surface-2); padding: 0.1rem 0.3rem; border-radius: 2px; color: var(--ink); }
+
+/* ---------- Offer ---------- */
+.offer { padding-bottom: clamp(2.5rem, 6vw, 4rem); }
+.offer .panel { padding: clamp(1.4rem, 3.5vw, 2.2rem); }
+.offer h2 { font-size: var(--step-2); max-width: 24ch; margin-bottom: 0.7rem; }
+.offer > .panel > p { margin: 0 0 1.4rem; max-width: 60ch; color: var(--ink-soft); }
+.offer ul { margin: 0 0 1.6rem; padding: 0; list-style: none; display: grid; gap: 0.5rem; max-width: 60ch; }
+.offer li { display: flex; gap: 0.65rem; align-items: baseline; font-size: var(--step--1); color: var(--ink-soft); }
+.offer li::before { content: "+"; font-family: var(--f-num); color: var(--accent); font-weight: 700; }
+.buy { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.btn {
+  display: inline-block; background: var(--accent); color: var(--accent-ink);
+  text-decoration: none; font-weight: 650; font-size: var(--step-0);
+  padding: 0.7rem 1.4rem; border-radius: 2px; border: 1px solid transparent;
+}
+.btn:hover { filter: brightness(1.08); }
+.price { font-family: var(--f-num); font-size: var(--step--1); color: var(--muted); }
+.price b { color: var(--ink); font-size: var(--step-0); }
+
+/* ---------- Footer ---------- */
+footer { border-top: 1px solid var(--rule); background: var(--surface); }
+footer .wrap { padding-block: 1.5rem 2.5rem; display: grid; gap: 0.6rem; }
+footer p { margin: 0; font-size: var(--step--1); color: var(--muted); max-width: 68ch; }
+
+/* ---------- Sticky mobile figure ---------- */
+.stickybar { display: none; }
+@media (max-width: 900px) {
+  .stickybar {
+    display: flex; position: sticky; bottom: 0; z-index: 5;
+    justify-content: space-between; align-items: center; gap: 1rem;
+    padding: 0.7rem clamp(1rem, 4vw, 2.5rem);
+    background: var(--surface); border-top: 1px solid var(--rule);
+  }
+  .stickybar span { font-size: var(--step--1); color: var(--muted); }
+  .stickybar b { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-size: var(--step-1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="mark">stundensatz<span>.</span>rechner</div>
+    <p>Kostenlos · rechnet im Browser · keine Daten werden übertragen</p>
+  </div>
+</header>
+
+<main>
+  <section class="wrap intro">
+    <p class="eyebrow">Für Selbstständige, Freiberufler und Handwerker</p>
+    <h1>Was du pro Stunde verlangen musst.</h1>
+    <p class="lede">
+      Die meisten rechnen mit 160 Stunden im Monat und können am Ende 90 abrechnen.
+      Urlaub, Krankheit, Buchhaltung, Angebote, Leerlauf — alles Zeit, die niemand bezahlt.
+      Trag deine Zahlen ein und sieh, welcher Satz deine Kosten wirklich deckt.
+    </p>
+  </section>
+
+  <section class="wrap calc">
+    <form class="panel" id="form" novalidate>
+      <fieldset>
+        <legend>
+          <b>Was du zum Leben brauchst</b>
+          <small>Alles pro Monat, nach Steuern</small>
+        </legend>
+        <div class="rows">
+          <div class="row">
+            <label for="netto">Gewünschtes Netto
+              <i>Was am Monatsende privat übrig bleiben soll</i></label>
+            <div class="field"><input type="number" id="netto" value="2500" min="0" step="50" inputmode="decimal"><span class="unit">€</span></div>
+          </div>
+          <div class="row">
+            <label for="vorsorge">Kranken&shy;versicherung &amp; Altersvorsorge
+              <i>Zahlst du als Selbstständiger selbst</i></label>
+            <div class="field"><input type="number" id="vorsorge" value="800" min="0" step="50" inputmode="decimal"><span class="unit">€</span></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>
+          <b>Was der Betrieb kostet</b>
+          <small>Monatlich, ohne Umsatzsteuer</small>
+        </legend>
+        <div class="rows">
+          <div class="row">
+            <label for="betrieb">Betriebliche Fixkosten
+              <i>Büro, Werkzeug, Software, Versicherung, Kfz, Steuerberater</i></label>
+            <div class="field"><input type="number" id="betrieb" value="500" min="0" step="25" inputmode="decimal"><span class="unit">€</span></div>
+          </div>
+          <div class="row">
+            <label for="steuer">Steuersatz auf den Gewinn
+              <i>Grobe Annahme, bei kleineren Gewinnen eher 20–30 %</i></label>
+            <div class="field"><input type="number" id="steuer" value="30" min="0" max="60" step="1" inputmode="decimal"><span class="unit">%</span></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>
+          <b>Wie viel du arbeitest</b>
+          <small>Und wie viel davon jemand bezahlt</small>
+        </legend>
+        <div class="rows">
+          <div class="row">
+            <label for="wochenstunden">Wochenstunden</label>
+            <div class="field"><input type="number" id="wochenstunden" value="40" min="1" max="80" step="1" inputmode="decimal"><span class="unit">h</span></div>
+          </div>
+          <div class="row">
+            <label for="urlaub">Urlaubstage pro Jahr</label>
+            <div class="field"><input type="number" id="urlaub" value="30" min="0" max="200" step="1" inputmode="decimal"><span class="unit">d</span></div>
+          </div>
+          <div class="row">
+            <label for="krank">Krankheitstage pro Jahr</label>
+            <div class="field"><input type="number" id="krank" value="8" min="0" max="200" step="1" inputmode="decimal"><span class="unit">d</span></div>
+          </div>
+          <div class="row">
+            <label for="feiertage">Feiertage pro Jahr</label>
+            <div class="field"><input type="number" id="feiertage" value="10" min="0" max="30" step="1" inputmode="decimal"><span class="unit">d</span></div>
+          </div>
+
+          <div class="row quota">
+            <div class="head">
+              <label for="quote">Produktivquote <i>Anteil deiner Arbeitszeit, den du abrechnen kannst</i></label>
+              <output class="val" id="quoteOut" for="quote">60 %</output>
+            </div>
+            <input type="range" id="quote" min="25" max="95" step="5" value="60">
+            <div class="scale"><span>25 %</span><span>60 %</span><span>95 %</span></div>
+          </div>
+
+          <div class="row">
+            <label for="puffer">Gewinnaufschlag &amp; Risikopuffer
+              <i>Rücklage für Investitionen und schlechte Monate</i></label>
+            <div class="field"><input type="number" id="puffer" value="10" min="0" max="100" step="5" inputmode="decimal"><span class="unit">%</span></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>
+          <b>Was du heute verlangst</b>
+          <small>Optional — für den Abgleich</small>
+        </legend>
+        <div class="rows">
+          <div class="row">
+            <label for="aktuell">Aktueller Stundensatz</label>
+            <div class="field"><input type="number" id="aktuell" value="60" min="0" step="5" inputmode="decimal"><span class="unit">€</span></div>
+          </div>
+        </div>
+      </fieldset>
+    </form>
+
+    <aside class="panel result" aria-live="polite">
+      <div class="head">
+        <p class="eyebrow">Ergebnis</p>
+      </div>
+      <div class="verdict">
+        <div class="figure">
+          <b id="rate">—</b><span>€ / Std.</span>
+        </div>
+        <p class="figure-cap">Mindestsatz netto, ohne Umsatzsteuer</p>
+
+        <div class="breakdown">
+          <div><span>Tagessatz (8 Std.)</span><b id="daily">—</b></div>
+          <div><span>Nötiger Jahresumsatz</span><b id="revenue">—</b></div>
+          <div><span>Arbeitstage im Jahr</span><b id="days">—</b></div>
+          <div><span>Davon abrechenbare Stunden</span><b id="hours">—</b></div>
+        </div>
+
+        <div class="status" id="status">
+          <b id="statusTitle">—</b>
+          <p id="statusText">—</p>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="wrap sens">
+    <h2>Die Zahl, die alles entscheidet</h2>
+    <p class="lede">
+      Nicht deine Kosten bestimmen den Stundensatz, sondern der Anteil deiner Zeit, den
+      wirklich jemand bezahlt. Zwischen 50 % und 70 % Produktivquote liegen bei sonst
+      gleichen Zahlen Welten:
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>Berechnet mit deinen aktuellen Eingaben</caption>
+        <thead>
+          <tr>
+            <th scope="col">Produktivquote</th>
+            <th scope="col">Abrechenbare Stunden</th>
+            <th scope="col">Nötiger Stundensatz</th>
+            <th scope="col">Tagessatz</th>
+          </tr>
+        </thead>
+        <tbody id="sensBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="wrap method">
+    <h2>So wird gerechnet</h2>
+    <ol>
+      <li>Dein Zielnetto plus Vorsorge ergibt, was im Jahr privat ankommen muss.</li>
+      <li>Weil darauf noch Steuern fällig werden, wird der Betrag durch <code>1 − Steuersatz</code> geteilt — das ist der nötige Gewinn vor Steuern.</li>
+      <li>Dazu kommen die betrieblichen Fixkosten des Jahres. Ergebnis: der nötige Jahresumsatz.</li>
+      <li>Darauf kommt dein Puffer für Investitionen und schlechte Monate.</li>
+      <li>Arbeitstage sind 260 minus Urlaub, Krankheit und Feiertage. Mal Stunden pro Tag ergibt die Anwesenheitszeit.</li>
+      <li>Nur die Produktivquote davon ist abrechenbar. <code>Jahresumsatz ÷ abrechenbare Stunden</code> ist dein Mindestsatz.</li>
+    </ol>
+  </section>
+
+  <section class="wrap offer">
+    <div class="panel">
+      <p class="eyebrow">Vollständige Version</p>
+      <h2>Der Rechner ist der Anfang. Das Jahr ist der Rest.</h2>
+      <p>
+        Der Mindestsatz sagt dir, was du verlangen musst. Er sagt dir nicht, wie viel du
+        für die Steuernachzahlung zurücklegen sollst oder in welchem Monat es eng wird.
+        Dafür gibt es die Arbeitsmappe:
+      </p>
+      <ul>
+        <li>Steuerrücklage pro Monat, automatisch aus deinen Einnahmen — mit Warnung bei Unterdeckung</li>
+        <li>Liquiditätsplan über 12 Monate, Engpassmonate rot markiert</li>
+        <li>Alle Formeln gesperrt, nur die gelben Felder sind Eingabe — nichts geht kaputt</li>
+        <li>Als Excel-Datei und als Google-Sheets-Version</li>
+        <li>Kurzanleitung als PDF, zwei Seiten</li>
+      </ul>
+      <div class="buy">
+        <a class="btn" href="#" id="buy">Arbeitsmappe ansehen</a>
+        <p class="price"><b>29 €</b> einmalig · keine Abo-Falle · 14 Tage Geld zurück</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="stickybar">
+  <span>Dein Mindestsatz</span>
+  <b id="stickyRate">—</b>
+</div>
+
+<footer>
+  <div class="wrap">
+    <p>
+      <b>Kein Ersatz für Steuerberatung.</b> Der Rechner arbeitet mit einem pauschalen
+      Steuersatz und bildet weder deine persönliche Progression noch Gewerbesteuer,
+      Vorsorgeabzüge oder Sonderfälle exakt ab. Er zeigt eine Größenordnung — belastbare
+      Zahlen bekommst du von deinem Steuerberater.
+    </p>
+    <p>Alle Eingaben bleiben in deinem Browser. Es werden keine Daten gespeichert oder übertragen.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var euro = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+  var euro2 = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var num = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
+
+  var ids = ["netto", "vorsorge", "betrieb", "steuer", "wochenstunden", "urlaub", "krank", "feiertage", "quote", "puffer", "aktuell"];
+  var el = {};
+  ids.forEach(function (id) { el[id] = document.getElementById(id); });
+
+  var out = {
+    rate: document.getElementById("rate"),
+    sticky: document.getElementById("stickyRate"),
+    daily: document.getElementById("daily"),
+    revenue: document.getElementById("revenue"),
+    days: document.getElementById("days"),
+    hours: document.getElementById("hours"),
+    quoteOut: document.getElementById("quoteOut"),
+    sensBody: document.getElementById("sensBody"),
+    status: document.getElementById("status"),
+    statusTitle: document.getElementById("statusTitle"),
+    statusText: document.getElementById("statusText")
+  };
+
+  function val(id) {
+    var n = parseFloat(el[id].value);
+    return isFinite(n) ? n : 0;
+  }
+
+  function model() {
+    var steuer = Math.min(Math.max(val("steuer"), 0), 95) / 100;
+    var jahresNetto = (val("netto") + val("vorsorge")) * 12;
+    var gewinnVorSteuer = jahresNetto / (1 - steuer);
+    var umsatz = (gewinnVorSteuer + val("betrieb") * 12) * (1 + val("puffer") / 100);
+
+    var stundenProTag = val("wochenstunden") / 5;
+    var arbeitstage = Math.max(260 - val("urlaub") - val("krank") - val("feiertage"), 1);
+    var anwesenheit = arbeitstage * stundenProTag;
+
+    return {
+      umsatz: umsatz,
+      arbeitstage: arbeitstage,
+      stundenProTag: stundenProTag,
+      anwesenheit: anwesenheit,
+      rateAt: function (quote) {
+        var billable = anwesenheit * quote;
+        return billable > 0 ? umsatz / billable : 0;
+      }
+    };
+  }
+
+  function renderStatus(needed, current) {
+    var s = out.status;
+    s.classList.remove("is-good", "is-warn", "is-bad");
+
+    if (current <= 0) {
+      s.classList.add("is-warn");
+      out.statusTitle.textContent = "Kein Vergleichswert";
+      out.statusText.textContent = "Trag oben ein, was du heute verlangst — dann siehst du die Lücke in Euro.";
+      return;
+    }
+
+    var ratio = current / needed;
+    var m = model();
+    var billable = m.anwesenheit * (val("quote") / 100);
+    var gap = (needed - current) * billable;
+
+    if (ratio >= 1) {
+      s.classList.add("is-good");
+      out.statusTitle.textContent = "Dein Satz trägt";
+      out.statusText.textContent = "Du liegst " + Math.round((ratio - 1) * 100) +
+        " % über dem Mindestsatz. Das entspricht " + euro.format(Math.abs(gap)) + " Luft im Jahr.";
+    } else if (ratio >= 0.85) {
+      s.classList.add("is-warn");
+      out.statusTitle.textContent = "Knapp kalkuliert";
+      out.statusText.textContent = "Dir fehlen " + euro.format(gap) +
+        " im Jahr. Ein Auftragsloch oder eine längere Krankheit reißt dich ins Minus.";
+    } else {
+      s.classList.add("is-bad");
+      out.statusTitle.textContent = "Unterdeckung";
+      out.statusText.textContent = "Bei diesem Satz fehlen dir " + euro.format(gap) +
+        " im Jahr. Du arbeitest die Differenz unbezahlt ab.";
+    }
+  }
+
+  function renderSensitivity(m, currentQuote) {
+    var rows = "";
+    [40, 50, 60, 70, 80].forEach(function (q) {
+      var billable = m.anwesenheit * (q / 100);
+      var rate = m.rateAt(q / 100);
+      var cls = q === currentQuote ? ' class="is-current"' : "";
+      rows += "<tr" + cls + "><td>" + q + " %</td><td>" + num.format(billable) +
+        " h</td><td>" + euro2.format(rate) + "</td><td>" +
+        euro.format(rate * m.stundenProTag) + "</td></tr>";
+    });
+    out.sensBody.innerHTML = rows;
+  }
+
+  function update() {
+    var quote = val("quote");
+    out.quoteOut.textContent = quote + " %";
+
+    var m = model();
+    var rate = m.rateAt(quote / 100);
+
+    out.rate.textContent = rate.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    out.sticky.textContent = euro2.format(rate);
+    out.daily.textContent = euro.format(rate * m.stundenProTag);
+    out.revenue.textContent = euro.format(m.umsatz);
+    out.days.textContent = num.format(m.arbeitstage);
+    out.hours.textContent = num.format(m.anwesenheit * (quote / 100)) + " h";
+
+    renderSensitivity(m, Math.round(quote / 10) * 10);
+    renderStatus(rate, val("aktuell"));
+  }
+
+  ids.forEach(function (id) {
+    el[id].addEventListener("input", update);
+  });
+
+  document.getElementById("buy").addEventListener("click", function (e) {
+    e.preventDefault();
+    window.alert("Platzhalter — hier kommt später der Link zu Gumroad oder Etsy hin.");
+  });
+
+  update();
+})();
+</script>
