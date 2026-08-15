@@ -1,0 +1,326 @@
+<title>Barrierefreiheits-Prüfung</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Technische Prüfung Ihrer Website nach WCAG 2.1 AA — dokumentierter Befund mit Handlungsempfehlungen, in fünf Werktagen.">
+
+<style>
+:root{
+  --ground:#F2F3F1; --surface:#FCFCFB; --raise:#E8EAE6;
+  --ink:#1A1D23; --soft:#3D434D; --muted:#6B7280;
+  --rule:#CFD3CC; --rule-soft:#E2E5DF;
+  --accent:#1F3D6B; --accent-ink:#FFFFFF; --accent-wash:#DCE4F0;
+  --signal:#A8531B; --signal-wash:#F7E8DA;
+  --ok:#2A6741;
+
+  --f-ui: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --f-num: ui-monospace,"SF Mono",SFMono-Regular,"Cascadia Mono",Menlo,Consolas,monospace;
+
+  --s--1: clamp(.78rem,.76rem + .1vw,.84rem);
+  --s-0:  clamp(.97rem,.94rem + .14vw,1.04rem);
+  --s-1:  clamp(1.14rem,1.06rem + .36vw,1.34rem);
+  --s-2:  clamp(1.45rem,1.28rem + .78vw,2rem);
+  --s-3:  clamp(2.1rem,1.5rem + 2.7vw,3.6rem);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#12141A; --surface:#1A1E26; --raise:#232833;
+    --ink:#E8EAEE; --soft:#C2C7D0; --muted:#8D95A3;
+    --rule:#2F3542; --rule-soft:#262C37;
+    --accent:#7BA3DC; --accent-ink:#0E1830; --accent-wash:#1C2942;
+    --signal:#E09A5E; --signal-wash:#39281A;
+    --ok:#74C296;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#12141A; --surface:#1A1E26; --raise:#232833;
+  --ink:#E8EAEE; --soft:#C2C7D0; --muted:#8D95A3;
+  --rule:#2F3542; --rule-soft:#262C37;
+  --accent:#7BA3DC; --accent-ink:#0E1830; --accent-wash:#1C2942;
+  --signal:#E09A5E; --signal-wash:#39281A;
+  --ok:#74C296;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:var(--f-ui);font-size:var(--s-0);line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;line-height:1.14;letter-spacing:-.018em;text-wrap:balance;font-weight:660}
+p{margin:0}
+.wrap{max-width:1080px;margin-inline:auto;padding-inline:clamp(1rem,4vw,2.5rem)}
+.eyebrow{font-size:var(--s--1);text-transform:uppercase;letter-spacing:.15em;font-weight:650;color:var(--muted)}
+
+/* Kopf */
+.top{border-bottom:1px solid var(--rule);background:var(--surface)}
+.top .wrap{display:flex;flex-wrap:wrap;gap:.4rem 1.25rem;align-items:baseline;padding-block:1.1rem}
+.brand{font-family:var(--f-num);font-weight:700;letter-spacing:-.02em}
+.brand span{color:var(--accent)}
+.top p{color:var(--muted);font-size:var(--s--1)}
+
+/* Aufmacher */
+.hero{padding-block:clamp(2.5rem,7vw,4.5rem) clamp(1.5rem,4vw,2.5rem)}
+.hero h1{font-size:var(--s-3);max-width:17ch}
+.hero .lede{margin-top:1.2rem;max-width:60ch;font-size:var(--s-1);color:var(--soft);line-height:1.5}
+
+/* Faktenleiste — die Zahlen sind das Argument */
+.fakten{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;
+  margin-block:clamp(1.75rem,4vw,2.75rem)}
+.fakt{background:var(--surface);padding:1.15rem 1.25rem}
+.fakt b{display:block;font-family:var(--f-num);font-size:clamp(1.5rem,3.6vw,2.1rem);
+  font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.fakt .l{display:block;margin-top:.45rem;font-size:var(--s--1);color:var(--muted)}
+.fakt.warn b{color:var(--signal)}
+
+section{padding-block:clamp(2rem,5vw,3.25rem)}
+section h2{font-size:var(--s-2);max-width:24ch;margin-bottom:.8rem}
+section .intro{max-width:62ch;color:var(--soft);margin-bottom:1.6rem}
+
+/* Leistung */
+.pakete{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.25rem}
+.paket{background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+  padding:1.4rem;display:flex;flex-direction:column;gap:.9rem}
+.paket.haupt{border-color:var(--accent);border-width:2px}
+.paket h3{font-size:var(--s-1)}
+.preis{font-family:var(--f-num);font-size:var(--s-2);font-weight:700;letter-spacing:-.02em}
+.preis small{font-size:var(--s--1);color:var(--muted);font-weight:400;letter-spacing:0}
+.paket ul{margin:0;padding:0;list-style:none;display:grid;gap:.5rem}
+.paket li{display:flex;gap:.6rem;align-items:baseline;font-size:var(--s--1);color:var(--soft)}
+.paket li::before{content:"—";color:var(--accent);flex:none}
+.dauer{margin-top:auto;padding-top:.5rem;border-top:1px solid var(--rule-soft);
+  font-size:var(--s--1);color:var(--muted)}
+
+/* Ablauf — echte Reihenfolge, deshalb nummeriert */
+.ablauf{display:grid;gap:0;counter-reset:schritt}
+.schritt{display:grid;grid-template-columns:2.6rem 1fr;gap:1rem;
+  padding:1.1rem 0;border-top:1px solid var(--rule-soft)}
+.schritt:first-child{border-top:0}
+.schritt::before{counter-increment:schritt;content:counter(schritt,decimal-leading-zero);
+  font-family:var(--f-num);font-weight:700;color:var(--accent);font-size:var(--s-1)}
+.schritt b{display:block;margin-bottom:.2rem}
+.schritt p{color:var(--soft);font-size:var(--s--1);max-width:58ch}
+
+/* Klartext-Kasten */
+.klartext{background:var(--signal-wash);border-left:4px solid var(--signal);
+  border-radius:2px;padding:1.2rem 1.35rem;max-width:66ch}
+.klartext b{color:var(--signal)}
+.klartext p + p{margin-top:.7rem}
+
+/* Fragen */
+.fragen{display:grid;gap:0;max-width:70ch}
+.frage{border-top:1px solid var(--rule-soft);padding:1rem 0}
+.frage:first-child{border-top:0}
+.frage summary{cursor:pointer;font-weight:620;list-style:none}
+.frage summary::-webkit-details-marker{display:none}
+.frage summary::before{content:"+";color:var(--accent);font-family:var(--f-num);
+  font-weight:700;margin-right:.6rem}
+.frage[open] summary::before{content:"−"}
+.frage p{margin-top:.6rem;color:var(--soft);font-size:var(--s--1)}
+
+/* Abschluss */
+.cta{background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+  padding:clamp(1.5rem,4vw,2.4rem);display:grid;gap:1.1rem;max-width:70ch}
+.cta h2{margin:0}
+.cta .zeile{display:flex;flex-wrap:wrap;gap:.9rem;align-items:center}
+.btn{display:inline-block;background:var(--accent);color:var(--accent-ink);
+  text-decoration:none;font-weight:650;padding:.75rem 1.5rem;border-radius:2px}
+.btn:hover{filter:brightness(1.1)}
+.cta small{color:var(--muted);font-size:var(--s--1)}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+footer{border-top:1px solid var(--rule);background:var(--surface);margin-top:2rem}
+footer .wrap{padding-block:1.5rem 2.5rem;display:grid;gap:.6rem}
+footer p{font-size:var(--s--1);color:var(--muted);max-width:70ch}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">barrierefrei<span>.</span>check</div>
+    <p>Technische Prüfung nach WCAG 2.1 AA</p>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <section class="hero">
+      <p class="eyebrow">Barrierefreiheitsstärkungsgesetz</p>
+      <h1>Ist Ihre Website prüfbar — oder abmahnbar?</h1>
+      <p class="lede">
+        Seit dem 28. Juni 2025 gilt das BFSG ohne Übergangsfrist. Betroffen ist praktisch
+        jede Website mit Kontaktformular, Buchung oder Shop. Wir prüfen Ihre Seite technisch
+        durch und sagen Ihnen in fünf Werktagen genau, was zu tun ist.
+      </p>
+
+      <div class="fakten">
+        <div class="fakt warn">
+          <b>&gt; 70 %</b>
+          <span class="l">der betroffenen deutschen Firmenwebsites erfüllen die Anforderungen nicht</span>
+        </div>
+        <div class="fakt warn">
+          <b>100.000 €</b>
+          <span class="l">mögliches Bußgeld, dazu Abmahnungen durch Wettbewerber</span>
+        </div>
+        <div class="fakt">
+          <b>WCAG 2.1 AA</b>
+          <span class="l">der Maßstab, an dem geprüft wird</span>
+        </div>
+        <div class="fakt">
+          <b>5 Werktage</b>
+          <span class="l">bis Ihr Bericht vorliegt</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Was Sie bekommen</h2>
+      <p class="intro">
+        Fester Umfang, fester Preis, kein Beratungsgespräch nötig. Sie schicken die Adresse
+        Ihrer Website, wir schicken den Bericht.
+      </p>
+      <div class="pakete">
+        <div class="paket haupt">
+          <h3>Prüfbericht</h3>
+          <p class="preis">349 € <small>zzgl. USt.</small></p>
+          <ul>
+            <li>Bis zu 10 Seiten Ihrer Website geprüft</li>
+            <li>Automatisierte Prüfung nach WCAG 2.1 AA</li>
+            <li>Manuelle Kontrolle: Tastaturbedienung, Fokus, Alternativtexte, Formularfehler</li>
+            <li>Jeder Befund mit Schweregrad, Fundstelle und konkreter Handlungsanweisung</li>
+            <li>Getrennt nach rechtlich relevanten Verstößen und Empfehlungen</li>
+            <li>Bericht als PDF, direkt an Ihre Agentur weiterreichbar</li>
+          </ul>
+          <p class="dauer">Lieferung in 5 Werktagen</p>
+        </div>
+
+        <div class="paket">
+          <h3>Umsetzung</h3>
+          <p class="preis">ab 690 € <small>nach Aufwand</small></p>
+          <ul>
+            <li>Wir beheben die gefundenen Mängel im Quelltext</li>
+            <li>Schwerpunkt auf Vorlagen, damit eine Korrektur alle Unterseiten erfasst</li>
+            <li>Nachprüfung mit demselben Verfahren als Nachweis</li>
+            <li>Vorher-Nachher-Vergleich der Befunde</li>
+          </ul>
+          <p class="dauer">Angebot nach dem Prüfbericht, Umfang dann bekannt</p>
+        </div>
+
+        <div class="paket">
+          <h3>Nachprüfung</h3>
+          <p class="preis">149 € <small>zzgl. USt.</small></p>
+          <ul>
+            <li>Erneute Prüfung nach Ihren eigenen Korrekturen</li>
+            <li>Gegenüberstellung mit dem Erstbefund</li>
+            <li>Dokumentation Ihrer Bemühungen</li>
+          </ul>
+          <p class="dauer">Lieferung in 3 Werktagen</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Klartext, bevor Sie bestellen</h2>
+      <div class="klartext">
+        <p>
+          <b>Wir sind keine Anwaltskanzlei.</b> Sie bekommen eine technische Befundaufnahme
+          nach WCAG 2.1 AA — kein Testat, keine Rechtsberatung und keine Zusage von
+          Rechtssicherheit. Wer Ihnen „abmahnsicher" verspricht, verspricht etwas, das er
+          nicht halten kann.
+        </p>
+        <p>
+          <b>Automatik allein reicht nicht.</b> Maschinelle Prüfung findet erfahrungsgemäß
+          nur rund ein Drittel der Barrieren. Deshalb ist bei jedem Auftrag eine manuelle
+          Durchsicht dabei. Ein Bericht, der nur ein Werkzeug-Ausdruck ist, hilft Ihnen nicht.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Wie es abläuft</h2>
+      <div class="ablauf">
+        <div class="schritt">
+          <div><b>Adresse schicken</b>
+            <p>Eine E-Mail mit der Adresse Ihrer Website genügt. Kein Termin, kein Telefonat.</p></div>
+        </div>
+        <div class="schritt">
+          <div><b>Automatisierte Prüfung</b>
+            <p>Startseite und die wichtigsten Unterseiten werden gegen die Erfolgskriterien der WCAG 2.1 Stufe AA geprüft.</p></div>
+        </div>
+        <div class="schritt">
+          <div><b>Manuelle Durchsicht</b>
+            <p>Tastaturbedienung, Fokusreihenfolge, Sinnhaftigkeit der Alternativtexte und Formularfehlermeldungen — alles, was keine Maschine beurteilen kann.</p></div>
+        </div>
+        <div class="schritt">
+          <div><b>Bericht</b>
+            <p>Sie erhalten das PDF mit allen Befunden, nach Schweregrad sortiert und mit konkreter Handlungsanweisung je Punkt.</p></div>
+        </div>
+        <div class="schritt">
+          <div><b>Umsetzung — wenn Sie wollen</b>
+            <p>Entweder Ihre Agentur arbeitet den Bericht ab, oder wir übernehmen das. Danach belegt eine Nachprüfung das Ergebnis.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Häufige Fragen</h2>
+      <div class="fragen">
+        <details class="frage">
+          <summary>Bin ich überhaupt betroffen?</summary>
+          <p>Das BFSG zielt auf Dienstleistungen gegenüber Verbrauchern. Praktisch trifft es
+          Websites mit Kontaktformular, Terminbuchung, Shop oder Downloads. Kleinstunternehmen
+          sind bei Dienstleistungen unter bestimmten Voraussetzungen ausgenommen — ob das auf
+          Sie zutrifft, ist eine Rechtsfrage, die wir nicht für Sie entscheiden können.
+          Schreiben Sie uns im Zweifel, wir sagen Ihnen offen, wenn eine Prüfung sich für Sie
+          nicht lohnt.</p>
+        </details>
+        <details class="frage">
+          <summary>Warum kein kostenloser Online-Test?</summary>
+          <p>Weil kostenlose Scanner genau den Teil abdecken, der automatisch prüfbar ist —
+          etwa ein Drittel. Sie erzeugen ein grünes Ergebnis bei einer Seite, die für einen
+          Screenreader unbenutzbar ist. Das ist gefährlicher als gar kein Test.</p>
+        </details>
+        <details class="frage">
+          <summary>Kann meine Agentur das nicht selbst?</summary>
+          <p>Oft ja — wenn sie es kann und wenn sie es tut. Der Prüfbericht ist unabhängig
+          davon nützlich, weil er eine Aufgabenliste liefert, gegen die Sie Ihre Agentur
+          beauftragen und das Ergebnis abnehmen können.</p>
+        </details>
+        <details class="frage">
+          <summary>Was, wenn nichts gefunden wird?</summary>
+          <p>Dann steht das im Bericht, und Sie haben eine dokumentierte Bestandsaufnahme zum
+          Prüfzeitpunkt. Bei über 70 % der geprüften Seiten ist das erfahrungsgemäß nicht der
+          Fall.</p>
+        </details>
+        <details class="frage">
+          <summary>Wie lange gilt der Bericht?</summary>
+          <p>Er dokumentiert den Zustand zum Prüfzeitpunkt. Nach größeren Änderungen an der
+          Website empfiehlt sich eine Nachprüfung.</p>
+        </details>
+      </div>
+    </section>
+
+    <section>
+      <div class="cta">
+        <p class="eyebrow">Nächster Schritt</p>
+        <h2>Adresse schicken, Bericht bekommen.</h2>
+        <p>
+          Schreiben Sie uns die Adresse Ihrer Website. Sie erhalten eine Rückmeldung mit dem
+          verbindlichen Umfang — danach entscheiden Sie.
+        </p>
+        <div class="zeile">
+          <a class="btn" href="mailto:">Prüfung anfragen</a>
+          <small>Antwort in der Regel am selben Werktag</small>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>
+      <b>Hinweis:</b> Diese Seite und die angebotene Leistung stellen keine Rechtsberatung
+      dar. Die Prüfung erfolgt technisch nach WCAG 2.1 Stufe AA und dokumentiert den Befund
+      zum Prüfzeitpunkt. Eine rechtliche Bewertung Ihrer Pflichten nach dem BFSG nimmt eine
+      Rechtsanwältin oder ein Rechtsanwalt vor.
+    </p>
+    <p>Platzhalter — E-Mail-Adresse, Impressum und Datenschutzerklärung müssen vor der Veröffentlichung ergänzt werden.</p>
+  </div>
+</footer>
