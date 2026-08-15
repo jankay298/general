@@ -1,0 +1,24 @@
+{
+  "_hinweis": "Kopieren nach data/stammdaten.json und auf den eigenen Betrieb einstellen. Wichtigster Wert: mittellohn.",
+
+  "mittellohn": "42.00",
+  "gk_lohn": "0.25",
+  "gk_material": "0.10",
+  "wagnis_gewinn": "0.12",
+  "rabatt": "0.00",
+  "skonto": "0.02",
+  "fahrtkosten_je_km": "0.70",
+  "umsatzsteuer": "0.19",
+  "zahlungsziel_tage": 14,
+  "gueltig_tage": 30,
+
+  "firma": {
+    "name": "Muster Malerbetrieb GmbH",
+    "strasse": "Handwerkerweg 12",
+    "plz_ort": "12345 Musterstadt",
+    "telefon": "0123 456789",
+    "email": "info@muster-malerbetrieb.de",
+    "ust_idnr": "DE123456789",
+    "iban": "DE00 0000 0000 0000 0000 00"
+  }
+}

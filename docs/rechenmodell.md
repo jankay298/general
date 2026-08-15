@@ -123,7 +123,7 @@ M09, M08, M10.
 | Umsatzsteuer 19 % | 615,77 € |
 | **Gesamtbetrag brutto** | **3.856,67 €** |
 | Deckungsbeitrag | 400,22 € |
-| Marge | 12,4 % |
+| Marge | 12,3 % |
 | Erlös je Stunde | 71,75 € |
 
 Weicht die Engine hiervon ab, ist die Rundungsreihenfolge die erste Verdächtige.

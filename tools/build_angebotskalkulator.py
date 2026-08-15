@@ -9,7 +9,9 @@ docs/rechenmodell.md beschrieben und ist zugleich die Referenz für die
 Angebots-Engine der App.
 """
 
+import json
 import sys
+from pathlib import Path
 
 from openpyxl import Workbook
 from openpyxl.comments import Comment
@@ -85,33 +87,23 @@ KALK = [
 ]
 
 # --- Leistungskatalog -----------------------------------------------------
-# Nr, Gewerk, Leistung, Einheit, Zeit/Einheit (Std), Material/Einheit (EUR), Hinweis
-KATALOG = [
-    ("M01", "Maler", "Böden und Mobiliar abdecken, Kanten abkleben", "m²", 0.05, 0.35, "Bezug: Bodenfläche"),
-    ("M02", "Maler", "Untergrund reinigen und vorbereiten", "m²", 0.04, 0.10, ""),
-    ("M03", "Maler", "Risse und Löcher spachteln, schleifen", "m²", 0.06, 0.45, "Nur anteilige Fläche ansetzen"),
-    ("M04", "Maler", "Tiefengrund / Haftgrund auftragen", "m²", 0.03, 0.55, ""),
-    ("M05", "Maler", "Wände streichen, 2 Anstriche Dispersion", "m²", 0.12, 1.25, "Farbe ca. 0,35 l/m²"),
-    ("M06", "Maler", "Decken streichen, 2 Anstriche Dispersion", "m²", 0.15, 1.25, "Über Kopf, höherer Zeitansatz"),
-    ("M07", "Maler", "Fenster- und Heizkörpernischen streichen", "m²", 0.25, 1.60, "Kleinteilig"),
-    ("M08", "Maler", "Türblatt lackieren, beidseitig", "Stk", 1.20, 12.00, ""),
-    ("M09", "Maler", "Türzarge lackieren", "Stk", 0.80, 7.50, ""),
-    ("M10", "Maler", "Endreinigung und Abfallentsorgung", "m²", 0.04, 0.25, "Bezug: Bodenfläche"),
-    ("M11", "Maler", "Raufasertapete entfernen", "m²", 0.18, 0.30, ""),
-    ("M12", "Maler", "An- und Abfahrt, Rüst- und Räumzeit", "pausch.", 1.50, 0.00, "Je Einsatz"),
-    ("T01", "Trockenbau", "Gipskartonwand beplanken, einlagig", "m²", 0.35, 14.50, ""),
-    ("T02", "Trockenbau", "Fugen spachteln Q2", "m²", 0.12, 1.10, ""),
-    ("B01", "Boden", "Laminat verlegen inkl. Trittschall", "m²", 0.25, 18.00, ""),
-    ("B02", "Boden", "Sockelleisten montieren", "m", 0.10, 4.20, ""),
-    ("E01", "Elektro", "Steckdose / Schalter tauschen", "Stk", 0.35, 6.50, ""),
-    ("E02", "Elektro", "Leuchte montieren und anschließen", "Stk", 0.50, 0.00, "Leuchte bauseits"),
-    ("L01", "Logistik", "Be- und Entladen (Personalstunde)", "Std", 1.00, 0.00, ""),
-    ("L02", "Logistik", "Transportfahrt Nutzfahrzeug", "km", 0.02, 0.45, "Zeit + Betriebskosten je km"),
-    ("L03", "Logistik", "Umzugskarton packen inkl. Material", "Stk", 0.12, 2.20, ""),
-    ("L04", "Logistik", "Möbeldemontage / -montage", "Std", 1.00, 0.00, ""),
-    ("L05", "Logistik", "Einlagerung je m³ und Monat", "m³", 0.05, 8.00, ""),
-    ("L06", "Logistik", "Halteverbotszone beantragen und stellen", "pausch.", 1.00, 95.00, ""),
-]
+# Eine Quelle für Excel-Vorlage und Angebots-Engine: data/leistungskatalog.json.
+# Wer hier eine Leistung ergänzt, ergänzt sie für beide.
+KATALOG_JSON = Path(__file__).resolve().parent.parent / "data" / "leistungskatalog.json"
+
+
+def katalog_laden():
+    """[(Nr, Gewerk, Leistung, Einheit, Zeit/Einh, Material/Einh, Hinweis), ...]"""
+    roh = json.loads(KATALOG_JSON.read_text(encoding="utf-8"))
+    return [
+        (e["nr"], e["gewerk"], e["leistung"], e["einheit"],
+         e["zeit_je_einheit_std"], e["material_je_einheit_eur"], e.get("hinweis", ""))
+        for e in roh["leistungen"]
+    ]
+
+
+KATALOG = katalog_laden()
+
 
 # Vorbelegte Beispielkalkulation: 45 m² Wohnung komplett streichen.
 # (Katalog-Nr, Mengenformel oder Zahl)

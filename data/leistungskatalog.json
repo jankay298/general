@@ -1,0 +1,222 @@
+{
+  "version": 1,
+  "hinweis": "Zeit- und Materialansaetze sind Branchen-Richtwerte dieser Vorlage zur Orientierung, keine externe Preisliste. Durch eigene Nachkalkulationswerte ersetzen.",
+  "leistungen": [
+    {
+      "nr": "M01",
+      "gewerk": "Maler",
+      "leistung": "Böden und Mobiliar abdecken, Kanten abkleben",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.05,
+      "material_je_einheit_eur": 0.35,
+      "hinweis": "Bezug: Bodenfläche"
+    },
+    {
+      "nr": "M02",
+      "gewerk": "Maler",
+      "leistung": "Untergrund reinigen und vorbereiten",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.04,
+      "material_je_einheit_eur": 0.1,
+      "hinweis": ""
+    },
+    {
+      "nr": "M03",
+      "gewerk": "Maler",
+      "leistung": "Risse und Löcher spachteln, schleifen",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.06,
+      "material_je_einheit_eur": 0.45,
+      "hinweis": "Nur anteilige Fläche ansetzen"
+    },
+    {
+      "nr": "M04",
+      "gewerk": "Maler",
+      "leistung": "Tiefengrund / Haftgrund auftragen",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.03,
+      "material_je_einheit_eur": 0.55,
+      "hinweis": ""
+    },
+    {
+      "nr": "M05",
+      "gewerk": "Maler",
+      "leistung": "Wände streichen, 2 Anstriche Dispersion",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.12,
+      "material_je_einheit_eur": 1.25,
+      "hinweis": "Farbe ca. 0,35 l/m²"
+    },
+    {
+      "nr": "M06",
+      "gewerk": "Maler",
+      "leistung": "Decken streichen, 2 Anstriche Dispersion",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.15,
+      "material_je_einheit_eur": 1.25,
+      "hinweis": "Über Kopf, höherer Zeitansatz"
+    },
+    {
+      "nr": "M07",
+      "gewerk": "Maler",
+      "leistung": "Fenster- und Heizkörpernischen streichen",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.25,
+      "material_je_einheit_eur": 1.6,
+      "hinweis": "Kleinteilig"
+    },
+    {
+      "nr": "M08",
+      "gewerk": "Maler",
+      "leistung": "Türblatt lackieren, beidseitig",
+      "einheit": "Stk",
+      "zeit_je_einheit_std": 1.2,
+      "material_je_einheit_eur": 12.0,
+      "hinweis": ""
+    },
+    {
+      "nr": "M09",
+      "gewerk": "Maler",
+      "leistung": "Türzarge lackieren",
+      "einheit": "Stk",
+      "zeit_je_einheit_std": 0.8,
+      "material_je_einheit_eur": 7.5,
+      "hinweis": ""
+    },
+    {
+      "nr": "M10",
+      "gewerk": "Maler",
+      "leistung": "Endreinigung und Abfallentsorgung",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.04,
+      "material_je_einheit_eur": 0.25,
+      "hinweis": "Bezug: Bodenfläche"
+    },
+    {
+      "nr": "M11",
+      "gewerk": "Maler",
+      "leistung": "Raufasertapete entfernen",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.18,
+      "material_je_einheit_eur": 0.3,
+      "hinweis": ""
+    },
+    {
+      "nr": "M12",
+      "gewerk": "Maler",
+      "leistung": "An- und Abfahrt, Rüst- und Räumzeit",
+      "einheit": "pausch.",
+      "zeit_je_einheit_std": 1.5,
+      "material_je_einheit_eur": 0.0,
+      "hinweis": "Je Einsatz"
+    },
+    {
+      "nr": "T01",
+      "gewerk": "Trockenbau",
+      "leistung": "Gipskartonwand beplanken, einlagig",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.35,
+      "material_je_einheit_eur": 14.5,
+      "hinweis": ""
+    },
+    {
+      "nr": "T02",
+      "gewerk": "Trockenbau",
+      "leistung": "Fugen spachteln Q2",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.12,
+      "material_je_einheit_eur": 1.1,
+      "hinweis": ""
+    },
+    {
+      "nr": "B01",
+      "gewerk": "Boden",
+      "leistung": "Laminat verlegen inkl. Trittschall",
+      "einheit": "m²",
+      "zeit_je_einheit_std": 0.25,
+      "material_je_einheit_eur": 18.0,
+      "hinweis": ""
+    },
+    {
+      "nr": "B02",
+      "gewerk": "Boden",
+      "leistung": "Sockelleisten montieren",
+      "einheit": "m",
+      "zeit_je_einheit_std": 0.1,
+      "material_je_einheit_eur": 4.2,
+      "hinweis": ""
+    },
+    {
+      "nr": "E01",
+      "gewerk": "Elektro",
+      "leistung": "Steckdose / Schalter tauschen",
+      "einheit": "Stk",
+      "zeit_je_einheit_std": 0.35,
+      "material_je_einheit_eur": 6.5,
+      "hinweis": ""
+    },
+    {
+      "nr": "E02",
+      "gewerk": "Elektro",
+      "leistung": "Leuchte montieren und anschließen",
+      "einheit": "Stk",
+      "zeit_je_einheit_std": 0.5,
+      "material_je_einheit_eur": 0.0,
+      "hinweis": "Leuchte bauseits"
+    },
+    {
+      "nr": "L01",
+      "gewerk": "Logistik",
+      "leistung": "Be- und Entladen (Personalstunde)",
+      "einheit": "Std",
+      "zeit_je_einheit_std": 1.0,
+      "material_je_einheit_eur": 0.0,
+      "hinweis": ""
+    },
+    {
+      "nr": "L02",
+      "gewerk": "Logistik",
+      "leistung": "Transportfahrt Nutzfahrzeug",
+      "einheit": "km",
+      "zeit_je_einheit_std": 0.02,
+      "material_je_einheit_eur": 0.45,
+      "hinweis": "Zeit + Betriebskosten je km"
+    },
+    {
+      "nr": "L03",
+      "gewerk": "Logistik",
+      "leistung": "Umzugskarton packen inkl. Material",
+      "einheit": "Stk",
+      "zeit_je_einheit_std": 0.12,
+      "material_je_einheit_eur": 2.2,
+      "hinweis": ""
+    },
+    {
+      "nr": "L04",
+      "gewerk": "Logistik",
+      "leistung": "Möbeldemontage / -montage",
+      "einheit": "Std",
+      "zeit_je_einheit_std": 1.0,
+      "material_je_einheit_eur": 0.0,
+      "hinweis": ""
+    },
+    {
+      "nr": "L05",
+      "gewerk": "Logistik",
+      "leistung": "Einlagerung je m³ und Monat",
+      "einheit": "m³",
+      "zeit_je_einheit_std": 0.05,
+      "material_je_einheit_eur": 8.0,
+      "hinweis": ""
+    },
+    {
+      "nr": "L06",
+      "gewerk": "Logistik",
+      "leistung": "Halteverbotszone beantragen und stellen",
+      "einheit": "pausch.",
+      "zeit_je_einheit_std": 1.0,
+      "material_je_einheit_eur": 95.0,
+      "hinweis": ""
+    }
+  ]
+}

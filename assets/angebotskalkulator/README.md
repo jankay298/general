@@ -35,7 +35,7 @@ Blatt, gelbe Füllung = Schlüsselannahme, die vor dem ersten Angebot zu prüfen
   Einlagerung) im selben Katalog.
 
 Vorbelegt ist der Fall „Wohnung 45 m² komplett streichen" inklusive Vorarbeiten und
-vier Türen: **3.240,90 € netto / 3.856,67 € brutto** bei 45,2 Stunden und 12,4 % Marge.
+vier Türen: **3.240,90 € netto / 3.856,67 € brutto** bei 45,2 Stunden und 12,3 % Marge.
 Wohnfläche überschreiben genügt — alles rechnet sich neu.
 
 ## Vor dem ersten Angebot
@@ -64,4 +64,8 @@ die .xlsx. Nach jeder Änderung neu durchrechnen lassen und auf null Formelfehle
 python3 <xlsx-skill>/scripts/recalc.py assets/angebotskalkulator/Angebotskalkulator_Handwerk.xlsx 180
 ```
 
-Die Formelkette und der Referenzfall stehen in [`docs/rechenmodell.md`](../../docs/rechenmodell.md).
+Der Leistungskatalog kommt aus [`data/leistungskatalog.json`](../../data/leistungskatalog.json)
+— dieselbe Datei speist die Angebots-Engine der App, damit beide nicht auseinanderlaufen.
+
+Die Formelkette und der Referenzfall stehen in [`docs/rechenmodell.md`](../../docs/rechenmodell.md),
+die App dazu in [`docs/angebotsassistent.md`](../../docs/angebotsassistent.md).
