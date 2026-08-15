@@ -109,7 +109,7 @@ drei fertigen Produkten.
 | Idee | Warum nicht |
 |---|---|
 | Kassenbuch, Fahrtenbuch | Excel erfüllt die GoBD-Unveränderbarkeit nicht; wird vom Finanzamt in der Regel nicht anerkannt. Rückerstattungen und schlechte Bewertungen vorprogrammiert. |
-| Rechnungsvorlagen (B2B) | Die E-Rechnungspflicht in Deutschland macht einfache Excel-Rechnungen für B2B zum Auslaufmodell. Ein Produkt mit Verfallsdatum. |
+| Rechnungsvorlagen (B2B) | Die E-Rechnungspflicht macht einfache Excel-Rechnungen im B2B zum Auslaufmodell: ab 01.01.2027 für Unternehmen über 800.000 € Umsatz, ab 01.01.2028 für alle übrigen. **Ausnahme:** Kleinunternehmer nach § 19 UStG sind dauerhaft befreit — für die bleibt eine Rechnungsvorlage unbegrenzt brauchbar. Siehe `RECHERCHE-ONLINEDIENSTLEISTUNG.md`. |
 | App oder Web-Anwendung mit Konto | Support, Bugfixes, Datenverlust, Rückerstattungen — bricht die Bedingung „einmal bauen, dann Ruhe". |
 | Haushaltsplaner für Privatleute | Nur, falls der Etsy-Test zeigt, dass dort Verbraucher-Traffic ankommt, den wir sonst verschenken. Sonst: falsche Zielgruppe, halber Preis, zehnfache Konkurrenz. |
 | Alles mit „KI" im Namen | Laufende API-Kosten pro Nutzung. Ein Einmalpreis und laufende Kosten passen nicht zusammen. |
