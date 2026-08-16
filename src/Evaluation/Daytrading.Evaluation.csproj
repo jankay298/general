@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Bewertungsschicht. netstandard2.0, weil sie sowohl im Backtester (Profil erzeugen)
+       als auch im cBot laufen muss (Profil laufend gegenhalten). -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>Daytrading.Evaluation</AssemblyName>
+    <RootNamespace>Daytrading.Evaluation</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Execution\Daytrading.Execution.csproj" />
+    <ProjectReference Include="..\Strategies\Daytrading.Strategies.csproj" />
+  </ItemGroup>
+
+</Project>

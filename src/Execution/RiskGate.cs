@@ -47,15 +47,26 @@ public sealed class RiskGate
     /// Alle offenen Positionen des <b>Kontos</b> mit ihrem aktuellen Preis - nicht nur die
     /// dieses Symbols. Die Grenzen gelten je Konto.
     /// </param>
+    /// <param name="riskMultiplier">
+    /// Faktor der Bewertungsschicht auf das Risiko je Trade: 1.0 normal, 0.5 bei Degraded,
+    /// 0 bei Suspended. Kürzt nur, erhöht nie.
+    /// </param>
     public RiskDecision Evaluate(
         Signal? signal,
         MarketSnapshot snapshot,
         AccountState account,
-        IReadOnlyList<OpenRiskItem>? openRisk = null)
+        IReadOnlyList<OpenRiskItem>? openRisk = null,
+        decimal riskMultiplier = 1m)
     {
         if (account == null)
         {
             throw new ArgumentNullException(nameof(account));
+        }
+
+        if (riskMultiplier < 0m || riskMultiplier > 1m)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(riskMultiplier), riskMultiplier, "Der Faktor der Bewertungsschicht darf nur kürzen, nie erhöhen.");
         }
 
         var positions = openRisk ?? NoOpenRisk;
@@ -66,6 +77,14 @@ public sealed class RiskGate
         }
 
         var direction = signal.Direction.Value;
+
+        if (riskMultiplier == 0m)
+        {
+            return RiskDecision.Reject(
+                RiskRejectionReason.StrategySuspended,
+                "Die Bewertungsschicht hat diese Kombination abgeschaltet. Bestehende Positionen laufen zu Ende, " +
+                "neue Trades gibt es erst nach bestandener Neuvalidierung.");
+        }
 
         if (!signal.StopLoss.HasValue)
         {
@@ -171,7 +190,8 @@ public sealed class RiskGate
                     account.DailyDrawdownPercent, openRiskPercent, _limits.MaxOpenRiskPercent));
         }
 
-        var desired = Math.Min(signal.RiskPercent ?? _limits.RiskPerTradePercent, _limits.RiskPerTradePercent);
+        var desired = Math.Min(signal.RiskPercent ?? _limits.RiskPerTradePercent, _limits.RiskPerTradePercent)
+                      * riskMultiplier;
         var wasCapped = false;
         var riskPercent = desired;
 

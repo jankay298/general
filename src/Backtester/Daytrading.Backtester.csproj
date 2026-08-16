@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Daytrading.Backtester</AssemblyName>
+    <RootNamespace>Daytrading.Backtester</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Data\Daytrading.Data.csproj" />
+    <ProjectReference Include="..\Evaluation\Daytrading.Evaluation.csproj" />
+    <ProjectReference Include="..\Execution\Daytrading.Execution.csproj" />
+    <ProjectReference Include="..\Strategies\Daytrading.Strategies.csproj" />
+  </ItemGroup>
+
+</Project>

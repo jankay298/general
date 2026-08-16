@@ -50,6 +50,13 @@ public sealed class ExecutionEngine
     public RiskDecision? LastDecision { get; private set; }
 
     /// <summary>
+    /// Faktor der Bewertungsschicht auf das Risiko je Trade: 1.0 bei Healthy und Watch,
+    /// 0.5 bei Degraded, 0 bei Suspended. Der Host setzt ihn aus dem Zustandsmonitor;
+    /// die Ausführungsschicht kürzt damit, erhöht aber nie.
+    /// </summary>
+    public decimal RiskMultiplier { get; set; } = 1m;
+
+    /// <summary>
     /// Verarbeitet eine abgeschlossene Bar samt Strategiesignal.
     /// </summary>
     /// <param name="accountOpenRisk">
@@ -82,7 +89,7 @@ public sealed class ExecutionEngine
         if (signal != null && signal.Kind == SignalKind.Entry)
         {
             var openRisk = accountOpenRisk ?? BuildOpenRisk(snapshot);
-            var decision = _riskGate.Evaluate(signal, snapshot, account, openRisk);
+            var decision = _riskGate.Evaluate(signal, snapshot, account, openRisk, RiskMultiplier);
             LastDecision = decision;
 
             if (decision.Accepted)

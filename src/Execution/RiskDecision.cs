@@ -19,6 +19,9 @@ public enum RiskRejectionReason
     AveragingDownNotAllowed,
     OpenRiskBudgetExhausted,
     PositionTooSmallForRiskBudget,
+
+    /// <summary>Die Bewertungsschicht hat die Kombination abgeschaltet - kein neuer Trade.</summary>
+    StrategySuspended,
 }
 
 /// <summary>Ergebnis der Risikoprüfung eines Einstiegssignals.</summary>
