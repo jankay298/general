@@ -4,7 +4,10 @@
        Bewusst hier und nicht je Projekt, damit Sprachstand und Null-Sicherheit
        überall identisch sind. -->
   <PropertyGroup>
-    <LangVersion>10.0</LangVersion>
+    <!-- C# 12 auch für die netstandard2.0-Bibliotheken: Die genutzten Sprachfeatures sind
+         reine Compilerfeatures und brauchen keine neuere Laufzeit. Was Laufzeitunterstützung
+         verlangt (record-Typen mit init, required), wird dort bewusst nicht verwendet. -->
+    <LangVersion>12.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <!-- Null-Warnungen sind Fehler: eine vergessene Prüfung soll den Build brechen,

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Datenpipeline. Zielt auf net8.0 und nicht auf netstandard2.0, weil sie nur von
+       Backtester und Werkzeugen genutzt wird - nie vom cBot. Dadurch stehen HttpClient,
+       System.Text.Json und Parquet ohne Klimmzüge zur Verfügung. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>Daytrading.Data</AssemblyName>
+    <RootNamespace>Daytrading.Data</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Parquet.Net" Version="6.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Strategies\Daytrading.Strategies.csproj" />
+  </ItemGroup>
+
+</Project>
