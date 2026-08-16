@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Ausführungs- und Risikoschicht. Wie die Strategie-Bibliothek auf netstandard2.0,
+       weil sowohl der Backtester (net8.0) als auch der cTrader-cBot (.NET 6 / .NET Framework 4)
+       exakt dieselben Regeln anwenden müssen. Zwei Implementierungen derselben Risikologik
+       wären der sicherste Weg, im Livebetrieb etwas anderes zu tun als im Backtest. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>Daytrading.Execution</AssemblyName>
+    <RootNamespace>Daytrading.Execution</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Strategies\Daytrading.Strategies.csproj" />
+  </ItemGroup>
+
+</Project>

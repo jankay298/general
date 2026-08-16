@@ -1,5 +1,6 @@
 {
   "_comment": "Globale Risikogrenzen der Ausfuehrungsschicht. Erlaeuterung siehe docs/architecture.md, Abschnitt 'Risikoregeln'. Werte gelten je Handelskonto, also je Strategie-Instanz. Prozentwerte beziehen sich auf die Kontostand-Basis bei Tagesbeginn.",
+  "_not_configurable": "Pflicht-Stop-Loss, kein Halten ueber Nacht und kein Nachkaufen in Verlustpositionen sind Regeln, keine Einstellungen. Sie sind fest in der Ausfuehrungsschicht verdrahtet und lassen sich hier bewusst nicht abschalten.",
 
   "riskPerTradePercent": 1.0,
   "maxOpenRiskPercent": 4.0,
@@ -12,9 +13,5 @@
   "capRiskToRemainingDailyBudget": true,
 
   "forceFlatMinutesBeforeSessionEnd": 15,
-  "maxHoldingMinutes": null,
-
-  "requireStopLoss": true,
-  "allowOvernightPositions": false,
-  "allowAveragingDown": false
+  "maxHoldingMinutes": null
 }

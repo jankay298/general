@@ -8,10 +8,13 @@ Der Weg einer Strategie ist immer derselbe: **Backtest → Demo → (viel späte
 ```
 /src
   /Strategies      Class Library (netstandard2.0) — Strategie-Logik, KEINE cAlgo-Abhängigkeit
+  /Execution       Class Library (netstandard2.0) — Risiko- und Tagesregeln, Positionsgröße
   /Backtester      Console App (net8.0)           — noch nicht gebaut
   /CBot            cTrader cBot                   — noch nicht gebaut
 /tests
   /Daytrading.Strategies.Tests                    — xUnit (net8.0)
+  /Daytrading.Execution.Tests                     — xUnit (net8.0)
+/config            Risikogrenzen und (später) Symbolkonfiguration
 /data              Marktdaten (nicht im Repo)
 /results           Backtest-Ergebnisse (nicht im Repo)
 ```
@@ -120,8 +123,9 @@ die Bibliothek ohne Fremdabhängigkeit und ohne cAlgo auskommt und der Aufwand j
 dotnet test
 ```
 
-92 Tests: Datentyp-Invarianten, Look-ahead-Freiheit, Parameter-Parsing, Indikatoren und das
-Verhalten der Beispielstrategie einschließlich Determinismus (gleicher Input → gleiche Signale).
+175 Tests, davon 92 für die Strategie-Bibliothek (Datentyp-Invarianten, Look-ahead-Freiheit,
+Parameter-Parsing, Indikatoren, Verhalten und Determinismus der Beispielstrategie) und 83 für
+die Ausführungsschicht (Positionsgröße, Risikobudget, Tagesgrenzen, Sessionregeln, Trade-Log).
 Der `StrategyHarness` im Testprojekt ist ein minimaler Host und der Beleg, dass Strategien
 vollständig ohne cTrader testbar sind.
 
@@ -191,6 +195,59 @@ Zwei bekannte Lücken dieser Regel, bewusst offen und im Report auszuweisen:
 Diese Regeln liegen vollständig in der Ausführungsschicht. Eine Strategie kann sie weder lesen
 noch umgehen — sie kennt weder Kontostand noch Equity.
 
+## Ausführungsschicht (`Daytrading.Execution`)
+
+Reine **Entscheidungsschicht**: Sie öffnet und schließt nichts selbst, sondern liefert
+Anweisungen. Der Backtester führt sie gegen sein Kostenmodell aus, der cBot gegen cTrader.
+Beide treffen damit garantiert dieselben Entscheidungen — und die Schicht ist ohne Broker,
+ohne Marktdaten und ohne cTrader testbar.
+
+| Baustein | Aufgabe |
+|---|---|
+| `RiskLimits` | die Grenzen aus `config/risk.defaults.json`, mit Widerspruchsprüfung beim Start |
+| `AccountState` | Kontostand, Equity, Tageshoch, Allzeithoch, Trade-Zähler — vom Host gepflegt |
+| `PositionSizer` | die einzige Stelle, an der eine Positionsgröße entsteht |
+| `OpenRiskItem` / `OpenRisk` | Summe des offenen Risikos über Positionen und Symbole |
+| `RiskGate` | nimmt ein Signal an oder lehnt es mit typisiertem Grund ab |
+| `SessionGuard` | flat vor Sessionende, Overnight-Sperre, maximale Haltedauer |
+| `ExecutionEngine` | verbindet alles zu einer Liste von `ExecutionInstruction` |
+| `TradeRecord` / `TradeRecordCsv` | ein Trade-Log-Format für Backtest, Demo und Live |
+
+Ablauf je Bar, in dieser Reihenfolge: Handelstag fortschreiben → Ausstiege aus den Tagesregeln
+→ Ausstiegswunsch der Strategie → erst danach ein neuer Einstieg durch das `RiskGate`.
+Stop- und Zieltreffer erzeugt die Schicht **nicht** — dafür braucht es die Kursbewegung
+innerhalb der Bar, die nur der Host kennt.
+
+### Positionsgröße
+
+```
+Größe = Risikobetrag / (Stopabstand × Punktwert je Einheit)
+```
+
+Gerundet wird immer **nach unten** auf die Schrittweite des Symbols. Aufrunden würde das
+erlaubte Risiko bei jedem einzelnen Trade systematisch überschreiten. Passt nicht einmal die
+Mindestgröße ins Budget, wird der Trade abgelehnt statt verkleinert — eine Position unter der
+Mindestgröße gibt es nicht, eine über dem Risiko darf es nicht geben.
+
+### Ablehnungsgründe
+
+Jede Ablehnung trägt einen typisierten Grund und eine lesbare Begründung; stille Ablehnungen
+gibt es nicht. `MissingStopLoss` und `InvalidStopLoss` werden als **Fehler** protokolliert —
+das ist ein Fehler in der Strategie, kein Marktzustand:
+
+`NotAnEntrySignal`, `MissingStopLoss`, `InvalidStopLoss`, `OutsideTradingWindow`,
+`TooCloseToSessionEnd`, `TotalDrawdownLimit`, `DailyLossLimit`, `DailyDrawdownLimit`,
+`MaxTradesPerDay`, `MaxConcurrentPositions`, `AveragingDownNotAllowed`,
+`OpenRiskBudgetExhausted`, `PositionTooSmallForRiskBudget`.
+
+### Was bewusst nicht konfigurierbar ist
+
+Pflicht-Stop-Loss, kein Halten über Nacht und kein Nachkaufen in Verlustpositionen sind fest
+verdrahtet. Ein Konfigurationsschalter dafür wäre genau die Lücke, die diese Schicht schließen
+soll: eine falsch gesetzte Zeile könnte sonst abschalten, was das Framework garantiert.
+Ein Test wacht darüber, dass die Konfigurationsdatei keine Schlüssel enthält, die der Code
+nicht liest.
+
 ## Plattformen
 
 Alles außer dem cBot ist reines .NET ohne native Abhängigkeiten und läuft auf Windows, macOS
@@ -202,3 +259,7 @@ Details zu cTrader auf dem Mac und zum Dauerbetrieb: [`setup.md`](setup.md).
 Datenpipeline (Binance, OANDA, Datenqualitätsreport, Parquet-Cache), Backtester mit Kostenmodell
 und Walk-Forward, cBot-Adapter, Bewertungsschicht mit Erwartungsprofil und den Zuständen
 Healthy / Watch / Degraded / Suspended.
+
+Offen in der Ausführungsschicht: Korrelationsgruppen (zwei Positionen auf Gold und Silber sind
+rechnerisch zwei Trades, faktisch weitgehend einer) und das Kostenmodell für Spread, Kommission
+und Slippage, das zusammen mit dem Backtester entsteht.
