@@ -135,7 +135,8 @@ Gilt je Handelskonto, also je Strategie-Instanz. Werte in `config/risk.defaults.
 | Tagesverlust | max. 4 % | **Realisiert**, gemessen ab der Kontostand-Basis bei Tagesbeginn. |
 | Tages-Drawdown | max. 4 % | **Unrealisiert**, gemessen vom höchsten Equity-Stand des laufenden Tages. |
 | Gesamt-Drawdown | max. 10 % | Vom historischen Equity-Hoch. Danach Strategie stoppen und Alarm loggen. |
-| Gleichzeitige Positionen | 1 | *Annahme, bitte bestätigen.* |
+| Gleichzeitig offenes Risiko | max. 4 % | Summe des Risikos aller offenen Positionen, gemessen bis zum jeweiligen Stop. |
+| Gleichzeitige Positionen | max. 5 | Nur Sicherheitsnetz. Die bindende Grenze ist das offene Risiko, nicht die Stückzahl. |
 | Trades pro Tag | 6 | *Annahme, bitte bestätigen.* |
 | Flat vor Sessionende | 15 Min | Zwangsschließung, kein Overnight, kein Wochenendhalten. |
 
@@ -145,13 +146,47 @@ zurückgefallen ist — ein Tag mit +3 % und anschließendem Rückgang auf −1 
 Drawdown-Grenze, obwohl der realisierte Verlust erst bei 1 % liegt. Beide werden getrennt geprüft
 und getrennt protokolliert.
 
-Zwei Konsequenzen aus den Zahlen:
+### Mehrere Positionen gleichzeitig — die bindende Regel
+
+Gleichzeitige Positionen sind erlaubt, begrenzt wird aber nicht ihre Anzahl, sondern das Risiko.
+Vor jeder Eröffnung muss gelten:
+
+```
+(Equity-Hoch des Tages − aktuelle Equity) + Summe des offenen Risikos ≤ 4 %
+```
+
+Also: **Wenn alle offenen Stops gleichzeitig auslösen, ist die Tagesgrenze immer noch eingehalten.**
+Die Anzahl der Positionen ergibt sich daraus von selbst:
+
+| Situation | Erlaubtes zusätzliches Risiko | Also maximal |
+|---|---|---|
+| Tagesbeginn, nichts verloren, nichts offen | 4 % | 4 Positionen zu je 1 % |
+| 2 Positionen offen (je 1 %), noch nichts realisiert | 2 % | 2 weitere |
+| 2 % Rückgang vom Tageshoch realisiert | 2 % | 2 Positionen zu je 1 % |
+| 4 % erreicht | 0 % | kein neuer Trade heute |
+
+Sieben gleichzeitige Trades zu je 1 % kann es damit nicht geben — die achte Prüfung schlägt schon
+beim fünften fehl. Der Wert `maxConcurrentPositions: 5` ist nur ein Sicherheitsnetz gegen viele
+winzige Positionen, keine eigentliche Steuergröße.
+
+Zwei weitere Konsequenzen aus den Zahlen:
 
 - Vier ausgestoppte Trades zu vollem Risiko beenden den Handelstag. Das Limit von 6 Trades lässt
   also Raum für Teilverluste und Nullnummern, nicht für sechs volle Stops.
 - Das Risiko des nächsten Trades wird auf das **verbleibende Tagesbudget** gedeckelt
   (`capRiskToRemainingDailyBudget`). Andernfalls würde der letzte Trade des Tages die
   Tagesgrenze planmäßig überschreiten statt sie einzuhalten.
+
+Zwei bekannte Lücken dieser Regel, bewusst offen und im Report auszuweisen:
+
+- **Korrelation.** Gold und Silber gleichzeitig, oder DAX und S&P 500, sind rechnerisch zwei
+  Positionen zu je 1 %, faktisch aber weitgehend eine Wette zu 2 %. Vorschlag für später:
+  Symbole in Korrelationsgruppen konfigurieren und das offene Risiko je Gruppe zusätzlich deckeln.
+- **Gaps und Slippage.** Der Stop begrenzt den Verlust nicht garantiert — bei einem Kurssprung
+  über den Stop hinweg fällt er größer aus. Die 4 % sind deshalb der geplante, nicht der maximal
+  mögliche Tagesverlust. Realisierte Abweichungen zwischen angenommenem und tatsächlichem
+  Ausstiegspreis werden protokolliert und in der Bewertungsschicht als *Ausführungsproblem*
+  geführt, nicht als Strategieproblem.
 
 Diese Regeln liegen vollständig in der Ausführungsschicht. Eine Strategie kann sie weder lesen
 noch umgehen — sie kennt weder Kontostand noch Equity.
