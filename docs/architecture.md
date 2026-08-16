@@ -125,6 +125,43 @@ Verhalten der Beispielstrategie einschließlich Determinismus (gleicher Input �
 Der `StrategyHarness` im Testprojekt ist ein minimaler Host und der Beleg, dass Strategien
 vollständig ohne cTrader testbar sind.
 
+## Risikoregeln (festgelegt)
+
+Gilt je Handelskonto, also je Strategie-Instanz. Werte in `config/risk.defaults.json`.
+
+| Grenze | Wert | Bedeutung |
+|---|---|---|
+| Risiko pro Trade | max. 1 % | Positionsgröße = Risikobetrag ÷ Stopabstand. Nie eine feste Lotgröße. |
+| Tagesverlust | max. 4 % | **Realisiert**, gemessen ab der Kontostand-Basis bei Tagesbeginn. |
+| Tages-Drawdown | max. 4 % | **Unrealisiert**, gemessen vom höchsten Equity-Stand des laufenden Tages. |
+| Gesamt-Drawdown | max. 10 % | Vom historischen Equity-Hoch. Danach Strategie stoppen und Alarm loggen. |
+| Gleichzeitige Positionen | 1 | *Annahme, bitte bestätigen.* |
+| Trades pro Tag | 6 | *Annahme, bitte bestätigen.* |
+| Flat vor Sessionende | 15 Min | Zwangsschließung, kein Overnight, kein Wochenendhalten. |
+
+Tagesverlust und Tages-Drawdown sind zwei verschiedene Dinge, auch wenn beide bei 4 % liegen:
+Der eine misst, was heute schon verloren **ist**, der andere, wie weit die Equity vom Tageshoch
+zurückgefallen ist — ein Tag mit +3 % und anschließendem Rückgang auf −1 % reißt die
+Drawdown-Grenze, obwohl der realisierte Verlust erst bei 1 % liegt. Beide werden getrennt geprüft
+und getrennt protokolliert.
+
+Zwei Konsequenzen aus den Zahlen:
+
+- Vier ausgestoppte Trades zu vollem Risiko beenden den Handelstag. Das Limit von 6 Trades lässt
+  also Raum für Teilverluste und Nullnummern, nicht für sechs volle Stops.
+- Das Risiko des nächsten Trades wird auf das **verbleibende Tagesbudget** gedeckelt
+  (`capRiskToRemainingDailyBudget`). Andernfalls würde der letzte Trade des Tages die
+  Tagesgrenze planmäßig überschreiten statt sie einzuhalten.
+
+Diese Regeln liegen vollständig in der Ausführungsschicht. Eine Strategie kann sie weder lesen
+noch umgehen — sie kennt weder Kontostand noch Equity.
+
+## Plattformen
+
+Alles außer dem cBot ist reines .NET ohne native Abhängigkeiten und läuft auf Windows, macOS
+(Intel wie Apple Silicon) und Linux; die CI baut und testet auf allen vieren. Einrichtung,
+Details zu cTrader auf dem Mac und zum Dauerbetrieb: [`setup.md`](setup.md).
+
 ## Noch nicht gebaut
 
 Datenpipeline (Binance, OANDA, Datenqualitätsreport, Parquet-Cache), Backtester mit Kostenmodell

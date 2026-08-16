@@ -1,0 +1,38 @@
+name: CI
+
+# Baut und testet auf allen Zielplattformen. Der Intel-Mac-Runner ist bewusst dabei:
+# Damit ist belegt, dass das Framework auf einem Intel-MacBook läuft, und nicht nur behauptet.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-15-intel   # x86_64 - entspricht einem Intel-MacBook
+          - macos-latest     # Apple Silicon
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Test
+        run: dotnet test --no-build -c Release

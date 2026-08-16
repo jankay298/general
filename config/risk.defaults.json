@@ -1,0 +1,19 @@
+{
+  "_comment": "Globale Risikogrenzen der Ausfuehrungsschicht. Erlaeuterung siehe docs/architecture.md, Abschnitt 'Risikoregeln'. Werte gelten je Handelskonto, also je Strategie-Instanz.",
+
+  "riskPerTradePercent": 1.0,
+  "maxDailyLossPercent": 4.0,
+  "maxDailyDrawdownPercent": 4.0,
+  "maxTotalDrawdownPercent": 10.0,
+
+  "maxConcurrentPositions": 1,
+  "maxTradesPerDay": 6,
+  "capRiskToRemainingDailyBudget": true,
+
+  "forceFlatMinutesBeforeSessionEnd": 15,
+  "maxHoldingMinutes": null,
+
+  "requireStopLoss": true,
+  "allowOvernightPositions": false,
+  "allowAveragingDown": false
+}

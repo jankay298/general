@@ -12,6 +12,10 @@
     <WarningsAsErrors>nullable</WarningsAsErrors>
     <Deterministic>true</Deterministic>
     <NeutralLanguage>en</NeutralLanguage>
+    <!-- Damit ausführbare Projekte (Tests, später der Backtester) auch dann starten,
+         wenn auf der Maschine nur eine neuere .NET-Runtime als 8 installiert ist.
+         Erspart auf Windows- und Mac-Rechnern die Frage, welche Runtime genau fehlt. -->
+    <RollForward>LatestMajor</RollForward>
   </PropertyGroup>
 
 </Project>
