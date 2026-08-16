@@ -1,0 +1,17 @@
+<Project>
+
+  <!-- Gemeinsame Einstellungen für alle Projekte der Solution.
+       Bewusst hier und nicht je Projekt, damit Sprachstand und Null-Sicherheit
+       überall identisch sind. -->
+  <PropertyGroup>
+    <LangVersion>10.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- Null-Warnungen sind Fehler: eine vergessene Prüfung soll den Build brechen,
+         nicht erst im Backtest auffallen. Paket-/Kompatibilitätswarnungen bleiben Warnungen. -->
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+</Project>

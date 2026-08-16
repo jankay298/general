@@ -1,0 +1,27 @@
+## .NET build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+.idea/
+TestResults/
+*.trx
+*.coverage
+*.nupkg
+
+## Marktdaten und Ergebnisse werden nicht eingecheckt.
+## Rohdaten sind zu groß, Ergebnisse werden reproduzierbar erzeugt.
+/data/**
+!/data/README.md
+!/data/.gitkeep
+/results/**
+!/results/README.md
+!/results/.gitkeep
+
+## Zugangsdaten gehören niemals ins Repository
+*.secrets.json
+appsettings.Local.json
+.env

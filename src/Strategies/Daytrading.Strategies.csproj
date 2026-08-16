@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- netstandard2.0: diese Bibliothek muss sowohl vom Backtester (net8.0) als auch
+       vom cTrader-cBot geladen werden können. cTrader Automate hängt an einer festen
+       .NET-Version; netstandard2.0 lädt in allen Varianten (4.x wie 5.x).
+       KEINE Referenz auf cAlgo.API in diesem Projekt - das ist die zentrale
+       Architekturregel des Frameworks. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>Daytrading.Strategies</AssemblyName>
+    <RootNamespace>Daytrading.Strategies</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>
