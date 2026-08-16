@@ -4,11 +4,12 @@
 
 | Teil | Windows | macOS (Intel) | macOS (Apple Silicon) | Linux |
 |---|---|---|---|---|
-| `src/Strategies` (Bibliothek) | ✅ | ✅ | ✅ | ✅ |
+| `src/Strategies`, `src/Execution`, `src/Evaluation` | ✅ | ✅ | ✅ | ✅ |
+| `src/Data` (Datenpipeline) | ✅ | ✅ | ✅ | ✅ |
+| `src/Backtester` (Matrix, Walk-Forward) | ✅ | ✅ | ✅ | ✅ |
 | `tests` (Unit-Tests) | ✅ | ✅ | ✅ | ✅ |
-| Backtester (geplant) | ✅ | ✅ | ✅ | ✅ |
-| Datenpipeline (geplant) | ✅ | ✅ | ✅ | ✅ |
-| cBot | nur in cTrader Desktop | nur in cTrader Mac | nur in cTrader Mac | ❌ |
+| `src/CBot`, `src/CBotExport` (bauen) | ✅ | ✅ | ✅ | ✅ |
+| cBots **ausführen** | nur in cTrader Desktop | nur in cTrader Mac | nur in cTrader Mac | ❌ |
 
 Alles, was wir selbst schreiben, ist reines .NET ohne native Abhängigkeiten und läuft überall.
 Die einzige Plattformbindung ist der cBot — der braucht die cTrader-Anwendung als Wirt.
@@ -53,9 +54,12 @@ Auf allen drei Systemen identisch:
 git clone https://github.com/jankay298/general.git
 cd general
 dotnet test
+
+# Kompletter Durchlauf auf synthetischen Daten, ohne Netz und ohne Broker:
+dotnet run --project src/Backtester -- demo
 ```
 
-Erwartet: 92 bestandene Tests, keine Warnungen. Kein Netz nötig außer für den ersten
+Erwartet: 313 bestandene Tests, keine Warnungen. Kein Netz nötig außer für den ersten
 NuGet-Restore, keine Marktdaten, keine cTrader-Installation.
 
 ## cTrader-spezifisch

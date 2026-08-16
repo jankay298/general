@@ -1,5 +1,6 @@
 using Daytrading.Data;
 using Daytrading.Data.Config;
+using Daytrading.Execution.Sessions;
 using Daytrading.Strategies.Model;
 
 namespace Daytrading.Data.Tests;
@@ -145,7 +146,7 @@ public class SymbolSessionCalendarTests
         config.SessionStart = "22:00";
         config.SessionEnd = "06:00";
 
-        var error = Assert.Throws<MarketDataException>(() => new SymbolSessionCalendar(config));
+        var error = Assert.Throws<ArgumentException>(() => new SymbolSessionCalendar(config));
 
         Assert.Contains("Mitternacht", error.Message);
     }

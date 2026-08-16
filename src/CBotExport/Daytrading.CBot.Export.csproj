@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Eigenes Projekt, weil cTrader je Assembly genau einen Algo-Typ erlaubt.
+       Der Export-cBot braucht nichts vom Framework - er schreibt nur Bars als CSV. -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>Daytrading.CBot.Export</AssemblyName>
+    <RootNamespace>Daytrading.CBot</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="cTrader.Automate" Version="1.0.19" />
+  </ItemGroup>
+
+</Project>

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Daytrading.Data.Config;
+namespace Daytrading.Execution.Sessions;
 
 /// <summary>
 /// Börsenfeiertage. Ohne diese Unterscheidung würde jeder Feiertag als Datenlücke gemeldet -
@@ -126,7 +126,7 @@ public sealed class UsEquityHolidayCalendar : IHolidayCalendar
         "" => NoHolidayCalendar.Instance,
         "none" => NoHolidayCalendar.Instance,
         "us-equity" => new UsEquityHolidayCalendar(),
-        _ => throw new MarketDataException(
-            $"Unbekannter Feiertagskalender '{name}'. Bekannt sind 'none' und 'us-equity'."),
+        _ => throw new ArgumentException(
+            $"Unbekannter Feiertagskalender '{name}'. Bekannt sind 'none' und 'us-equity'.", nameof(name)),
     };
 }

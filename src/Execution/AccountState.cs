@@ -108,6 +108,21 @@ public sealed class AccountState
         }
     }
 
+    /// <summary>
+    /// Übernimmt Kontostand und Equity vom Broker. Für den Livebetrieb, wo der Broker die
+    /// Wahrheit hält - Tagesbezug, Tageshoch und Trade-Zähler bleiben unberührt.
+    /// </summary>
+    public void SyncFromBroker(decimal balance, decimal equity)
+    {
+        if (balance <= 0m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(balance), balance, "Kontostand muss positiv sein.");
+        }
+
+        Balance = balance;
+        UpdateEquity(equity);
+    }
+
     /// <summary>Bucht ein realisiertes Ergebnis auf den Kontostand und passt die Equity entsprechend an.</summary>
     public void ApplyRealizedPnL(decimal pnl)
     {

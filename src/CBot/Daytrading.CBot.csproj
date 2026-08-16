@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- cTrader-Adapter. Zielt auf net6.0, weil das NuGet-Paket cTrader.Automate auf .NET 6
+       und .NET Framework 4.0 zielt. Die referenzierten Bibliotheken sind netstandard2.0 und
+       laden deshalb hier ebenso wie im Backtester auf net8.0.
+
+       In diesem Projekt steht KEINE Handelslogik. Landet hier eine Regel, ist etwas
+       schiefgelaufen: Sie gehört nach /Strategies oder /Execution und wäre hier weder
+       backtestbar noch testbar. -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>Daytrading.CBot</AssemblyName>
+    <RootNamespace>Daytrading.CBot</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="cTrader.Automate" Version="1.0.19" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Evaluation\Daytrading.Evaluation.csproj" />
+    <ProjectReference Include="..\Execution\Daytrading.Execution.csproj" />
+    <ProjectReference Include="..\Strategies\Daytrading.Strategies.csproj" />
+  </ItemGroup>
+
+</Project>

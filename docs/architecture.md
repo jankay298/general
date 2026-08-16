@@ -7,20 +7,22 @@ Der Weg einer Strategie ist immer derselbe: **Backtest → Demo → (viel späte
 
 ```
 /src
-  /Strategies      Class Library (netstandard2.0) — Strategie-Logik, KEINE cAlgo-Abhängigkeit
-  /Execution       Class Library (netstandard2.0) — Risiko- und Tagesregeln, Positionsgröße
-  /Backtester      Console App (net8.0)           — noch nicht gebaut
-  /CBot            cTrader cBot                   — noch nicht gebaut
-/tests
-  /Daytrading.Strategies.Tests                    — xUnit (net8.0)
-  /Daytrading.Execution.Tests                     — xUnit (net8.0)
-/config            Risikogrenzen und (später) Symbolkonfiguration
-/data              Marktdaten (nicht im Repo)
-/results           Backtest-Ergebnisse (nicht im Repo)
+  /Strategies      netstandard2.0  Strategie-Logik. KEINE cAlgo-Abhängigkeit.
+  /Execution       netstandard2.0  Risiko, Positionsgröße, Session- und Tagesregeln.
+  /Evaluation      netstandard2.0  Erwartungsprofil und laufende Selbstkontrolle.
+  /Data            net8.0          Datenquellen, Qualitätsprüfung, Parquet-Ablage.
+  /Backtester      net8.0          Matrix, Walk-Forward, Kostenmodell, Berichte, CLI.
+  /CBot            net6.0          cTrader-Adapter für den Handel.
+  /CBotExport      net6.0          cTrader-Adapter für den Datenexport.
+/tests             net8.0          313 Tests über alle Schichten.
+/config                            Symbol- und Risikokonfiguration.
+/data                              Marktdaten (nicht im Repo).
+/results                           Ergebnisse (nicht im Repo).
 ```
 
-`netstandard2.0` für die Strategie-Bibliothek ist Absicht: dieselbe Assembly muss vom Backtester
-auf .NET 8 und vom cBot innerhalb von cTrader Automate geladen werden können.
+Die Zielframeworks sind kein Zufall: Alles, was der cBot laden muss, ist `netstandard2.0` und
+läuft damit sowohl in cTrader (.NET 6 / .NET Framework 4) als auch im Backtester auf .NET 8.
+Was der cBot nie sieht — Datenpipeline und Backtester — darf net8.0 nutzen.
 
 ## Die zentrale Regel
 
@@ -33,17 +35,15 @@ cTrader-Backtester rechnet immer nur ein Symbol und eine Strategie pro Durchlauf
 aus vielen Strategien × vielen Assets × vielen Zeiträumen braucht einen eigenen Backtester —
 und der kann nur existieren, wenn die Logik nichts von cAlgo weiß.
 
-Zweite Konsequenz derselben Regel: Die harten Daytrading- und Risikoregeln (Pflicht-Stop,
-Positionsgröße aus Risiko in %, Tagesverlustgrenze, Drawdown-Grenze, Zwangsschließung vor
-Sessionende, maximale Anzahl Positionen und Trades) liegen in der Ausführungsschicht.
-Eine Strategie kann sie nicht umgehen, weil sie sie gar nicht sieht.
+Zweite Konsequenz derselben Regel: Die harten Daytrading- und Risikoregeln liegen in der
+Ausführungsschicht. Eine Strategie kann sie nicht umgehen, weil sie sie gar nicht sieht.
 
 ## Datentypen (`Daytrading.Strategies.Model`)
 
 | Typ | Zweck | Erzwungene Invariante |
 |---|---|---|
 | `Candle` | abgeschlossene Kursbar | Zeitstempel ist UTC; OHLC ist konsistent |
-| `BarSeries` / `IBarSeries` | Kurshistorie | Strategien sehen nur `IBarSeries` (nur lesend); Append erzwingt chronologische, duplikatfreie Bars |
+| `BarSeries` / `IBarSeries` | Kurshistorie | Strategien sehen nur die lesende Sicht; Append erzwingt chronologische, duplikatfreie Bars |
 | `MarketSnapshot` | was die Strategie je Bar sieht | mindestens eine Bar; kein Kontostand, keine Kosten, keine Zukunft |
 | `Signal` | Handelsabsicht | Einstieg **nur** mit Stop-Loss auf der richtigen Seite und Abstand > 0 |
 | `Position` | offene Position | positive Größe, UTC-Einstiegszeit |
@@ -59,8 +59,7 @@ wert als die Rechengeschwindigkeit von `double`.
 Strukturell statt disziplinarisch: Der Host hängt eine Bar erst an die `BarSeries` an, wenn sie
 abgeschlossen ist, und ruft danach `OnBar`. `IBarSeries` hat keine API, um in die Zukunft zu
 sehen. `MarketSnapshot.BarCloseTimeUtc` ist der Entscheidungszeitpunkt — nicht der Bar-Beginn.
-Der Test `MarketSnapshotTests.Strategy_sees_history_only_up_to_and_including_the_current_bar`
-prüft das je Bar.
+Der Test `Strategy_sees_history_only_up_to_and_including_the_current_bar` prüft das je Bar.
 
 ## Strategien
 
@@ -74,60 +73,26 @@ public interface IStrategy
 }
 ```
 
-`StrategyContext` liefert Symbol, Timeframe, Parameter, Log und einen festen Zufallsseed —
-und bewusst nichts weiter.
-
 `StrategyParameters` parst immer mit `InvariantCulture`, wirft bei unlesbaren Werten (statt still
 auf den Default zurückzufallen), protokolliert jeden verwendeten Wert einschließlich der Defaults
-und meldet übergebene, aber nie gelesene Schlüssel — der übliche Tippfehler, der sonst eine ganze
-Matrix mit anderen Parametern rechnet als gedacht. `Fingerprint` identifiziert eine
-Parameterkombination eindeutig und ist die Grundlage dafür, später die Anzahl der getesteten
-Kombinationen belegen zu können.
+und meldet übergebene, aber nie gelesene Schlüssel. `Fingerprint` identifiziert eine
+Parameterkombination eindeutig.
 
-Die `Version` im `StrategyDescriptor` ist wichtiger, als sie aussieht: Ein eingefrorenes
-Erwartungsprofil der Bewertungsschicht gilt für genau eine Version. Ändert sich die Logik, muss
-die Version steigen — sonst wird Live-Verhalten gegen ein Profil gemessen, das zu anderem Code gehört.
+`StrategyCatalog` ist das gemeinsame Verzeichnis von Backtester und cBot: Beide erzeugen unter
+demselben Namen dieselbe Strategie. Zwei getrennte Verzeichnisse wären der sicherste Weg, im
+Livebetrieb etwas anderes laufen zu lassen als im Test.
 
-## Beispielstrategie: Opening-Range-Breakout
+### Beispielstrategien
 
-`OpeningRangeBreakoutStrategy` bildet in den ersten *n* Minuten der Session eine Preisspanne und
-signalisiert den ersten Bar-Schluss darüber oder darunter.
+**`OpeningRangeBreakout`** bildet in den ersten *n* Minuten der Session eine Spanne und
+signalisiert den ersten Bar-Schluss darüber oder darunter. Stop wahlweise an der Gegenseite der
+Range oder als ATR-Vielfaches.
 
-| Parameter | Default | Bedeutung |
-|---|---|---|
-| `OpeningRangeMinutes` | 30 | Länge des Eröffnungsfensters ab Sessionbeginn |
-| `BreakoutBufferTicks` | 0 | Mindestabstand über/unter der Range in Ticks |
-| `StopLossMode` | `OppositeRangeSide` | oder `AtrMultiple` |
-| `AtrPeriod` / `AtrStopMultiple` | 14 / 1.5 | nur für `AtrMultiple` |
-| `TakeProfitR` | 2.0 | Ziel als Vielfaches des Stopabstands, 0 = kein Ziel |
-| `OneTradePerDay` | true | nur der erste Ausbruch je Handelstag |
-| `AllowLong` / `AllowShort` | true / true | Richtungsfilter |
-| `RiskPercent` | 0 | Risikowunsch je Trade, 0 = Default der Ausführungsschicht |
-
-Was die Strategie **nicht** tut und auch nicht tun kann: Positionsgröße berechnen, vor
-Sessionende schließen, Tagesverluste begrenzen, Haltedauer beenden. Das ist Sache der
-Ausführungsschicht.
-
-Verworfen wird ein Ausbruch, wenn keine Bar vollständig im Eröffnungsfenster liegt (etwa bei
-verkürzten Handelstagen oder zu grober Bargröße) oder wenn der Stopabstand kleiner als ein Tick
-wäre. Beides wird protokolliert statt stillschweigend zu einem Default-Stop zu führen.
-
-## Indikatoren
-
-Selbst implementiert und inkrementell (`RollingWindow<T>`, `AverageTrueRange` nach Wilder), damit
-die Bibliothek ohne Fremdabhängigkeit und ohne cAlgo auskommt und der Aufwand je Bar konstant bleibt.
-
-## Tests
-
-```bash
-dotnet test
-```
-
-175 Tests, davon 92 für die Strategie-Bibliothek (Datentyp-Invarianten, Look-ahead-Freiheit,
-Parameter-Parsing, Indikatoren, Verhalten und Determinismus der Beispielstrategie) und 83 für
-die Ausführungsschicht (Positionsgröße, Risikobudget, Tagesgrenzen, Sessionregeln, Trade-Log).
-Der `StrategyHarness` im Testprojekt ist ein minimaler Host und der Beleg, dass Strategien
-vollständig ohne cTrader testbar sind.
+**`VwapReversion`** setzt auf die Rückkehr zum sessionverankerten VWAP, wenn der Kurs mehrere
+Standardabweichungen abweicht — also auf das Scheitern von Ausbrüchen. Bewusst gegensätzlich zum
+ORB: Welche von beiden auf einem Symbol funktioniert, entscheidet der Backtest. Sie nutzt zudem
+den aktiven Ausstieg über `Signal.CloseAll` und meldet, wenn die Daten kein Volumen enthalten,
+statt still einen ungewichteten Durchschnitt als VWAP auszugeben.
 
 ## Risikoregeln (festgelegt)
 
@@ -136,130 +101,195 @@ Gilt je Handelskonto, also je Strategie-Instanz. Werte in `config/risk.defaults.
 | Grenze | Wert | Bedeutung |
 |---|---|---|
 | Risiko pro Trade | max. 1 % | Positionsgröße = Risikobetrag ÷ Stopabstand. Nie eine feste Lotgröße. |
+| Gleichzeitig offenes Risiko | max. 4 % | Summe des Risikos aller offenen Positionen, gemessen bis zum jeweiligen Stop. |
 | Tagesverlust | max. 4 % | **Realisiert**, gemessen ab der Kontostand-Basis bei Tagesbeginn. |
 | Tages-Drawdown | max. 4 % | **Unrealisiert**, gemessen vom höchsten Equity-Stand des laufenden Tages. |
 | Gesamt-Drawdown | max. 10 % | Vom historischen Equity-Hoch. Danach Strategie stoppen und Alarm loggen. |
-| Gleichzeitig offenes Risiko | max. 4 % | Summe des Risikos aller offenen Positionen, gemessen bis zum jeweiligen Stop. |
-| Gleichzeitige Positionen | max. 5 | Nur Sicherheitsnetz. Die bindende Grenze ist das offene Risiko, nicht die Stückzahl. |
-| Trades pro Tag | 6 | *Annahme, bitte bestätigen.* |
+| Gleichzeitige Positionen | max. 5 | Nur Sicherheitsnetz. Die bindende Grenze ist das offene Risiko. |
+| Trades pro Tag | 6 | |
 | Flat vor Sessionende | 15 Min | Zwangsschließung, kein Overnight, kein Wochenendhalten. |
 
 Tagesverlust und Tages-Drawdown sind zwei verschiedene Dinge, auch wenn beide bei 4 % liegen:
 Der eine misst, was heute schon verloren **ist**, der andere, wie weit die Equity vom Tageshoch
 zurückgefallen ist — ein Tag mit +3 % und anschließendem Rückgang auf −1 % reißt die
-Drawdown-Grenze, obwohl der realisierte Verlust erst bei 1 % liegt. Beide werden getrennt geprüft
-und getrennt protokolliert.
+Drawdown-Grenze, obwohl der realisierte Verlust erst bei 1 % liegt.
 
 ### Mehrere Positionen gleichzeitig — die bindende Regel
-
-Gleichzeitige Positionen sind erlaubt, begrenzt wird aber nicht ihre Anzahl, sondern das Risiko.
-Vor jeder Eröffnung muss gelten:
 
 ```
 (Equity-Hoch des Tages − aktuelle Equity) + Summe des offenen Risikos ≤ 4 %
 ```
 
-Also: **Wenn alle offenen Stops gleichzeitig auslösen, ist die Tagesgrenze immer noch eingehalten.**
+**Wenn alle offenen Stops gleichzeitig auslösen, ist die Tagesgrenze immer noch eingehalten.**
 Die Anzahl der Positionen ergibt sich daraus von selbst:
 
 | Situation | Erlaubtes zusätzliches Risiko | Also maximal |
 |---|---|---|
 | Tagesbeginn, nichts verloren, nichts offen | 4 % | 4 Positionen zu je 1 % |
-| 2 Positionen offen (je 1 %), noch nichts realisiert | 2 % | 2 weitere |
-| 2 % Rückgang vom Tageshoch realisiert | 2 % | 2 Positionen zu je 1 % |
+| 2 Positionen offen (je 1 %) | 2 % | 2 weitere |
+| 2 % Rückgang vom Tageshoch | 2 % | 2 Positionen zu je 1 % |
 | 4 % erreicht | 0 % | kein neuer Trade heute |
 
-Sieben gleichzeitige Trades zu je 1 % kann es damit nicht geben — die achte Prüfung schlägt schon
-beim fünften fehl. Der Wert `maxConcurrentPositions: 5` ist nur ein Sicherheitsnetz gegen viele
-winzige Positionen, keine eigentliche Steuergröße.
+Das offene Risiko wird vom **aktuellen** Preis bis zum Stop gemessen, nicht vom Einstieg: Der
+Weg zwischen Einstieg und aktuellem Preis steckt bereits im Tages-Drawdown und würde sonst
+doppelt zählen.
 
-Zwei weitere Konsequenzen aus den Zahlen:
+Zwei bekannte Lücken, bewusst offen und im Report auszuweisen:
 
-- Vier ausgestoppte Trades zu vollem Risiko beenden den Handelstag. Das Limit von 6 Trades lässt
-  also Raum für Teilverluste und Nullnummern, nicht für sechs volle Stops.
-- Das Risiko des nächsten Trades wird auf das **verbleibende Tagesbudget** gedeckelt
-  (`capRiskToRemainingDailyBudget`). Andernfalls würde der letzte Trade des Tages die
-  Tagesgrenze planmäßig überschreiten statt sie einzuhalten.
-
-Zwei bekannte Lücken dieser Regel, bewusst offen und im Report auszuweisen:
-
-- **Korrelation.** Gold und Silber gleichzeitig, oder DAX und S&P 500, sind rechnerisch zwei
-  Positionen zu je 1 %, faktisch aber weitgehend eine Wette zu 2 %. Vorschlag für später:
-  Symbole in Korrelationsgruppen konfigurieren und das offene Risiko je Gruppe zusätzlich deckeln.
-- **Gaps und Slippage.** Der Stop begrenzt den Verlust nicht garantiert — bei einem Kurssprung
-  über den Stop hinweg fällt er größer aus. Die 4 % sind deshalb der geplante, nicht der maximal
-  mögliche Tagesverlust. Realisierte Abweichungen zwischen angenommenem und tatsächlichem
-  Ausstiegspreis werden protokolliert und in der Bewertungsschicht als *Ausführungsproblem*
-  geführt, nicht als Strategieproblem.
-
-Diese Regeln liegen vollständig in der Ausführungsschicht. Eine Strategie kann sie weder lesen
-noch umgehen — sie kennt weder Kontostand noch Equity.
+- **Korrelation.** Gold und Silber gleichzeitig sind rechnerisch zwei Positionen zu je 1 %,
+  faktisch aber weitgehend eine Wette zu 2 %.
+- **Gaps und Slippage.** Die 4 % sind der geplante, nicht der maximal mögliche Tagesverlust.
 
 ## Ausführungsschicht (`Daytrading.Execution`)
 
 Reine **Entscheidungsschicht**: Sie öffnet und schließt nichts selbst, sondern liefert
 Anweisungen. Der Backtester führt sie gegen sein Kostenmodell aus, der cBot gegen cTrader.
-Beide treffen damit garantiert dieselben Entscheidungen — und die Schicht ist ohne Broker,
-ohne Marktdaten und ohne cTrader testbar.
+Beide treffen damit garantiert dieselben Entscheidungen.
 
 | Baustein | Aufgabe |
 |---|---|
-| `RiskLimits` | die Grenzen aus `config/risk.defaults.json`, mit Widerspruchsprüfung beim Start |
-| `AccountState` | Kontostand, Equity, Tageshoch, Allzeithoch, Trade-Zähler — vom Host gepflegt |
+| `RiskLimits` | die Grenzen, mit Widerspruchsprüfung beim Start |
+| `AccountState` | Kontostand, Equity, Tageshoch, Allzeithoch, Trade-Zähler |
 | `PositionSizer` | die einzige Stelle, an der eine Positionsgröße entsteht |
-| `OpenRiskItem` / `OpenRisk` | Summe des offenen Risikos über Positionen und Symbole |
 | `RiskGate` | nimmt ein Signal an oder lehnt es mit typisiertem Grund ab |
 | `SessionGuard` | flat vor Sessionende, Overnight-Sperre, maximale Haltedauer |
+| `TradingSessionCalendar` | Handelszeiten je Zeitzone samt Börsenfeiertagen |
 | `ExecutionEngine` | verbindet alles zu einer Liste von `ExecutionInstruction` |
-| `TradeRecord` / `TradeRecordCsv` | ein Trade-Log-Format für Backtest, Demo und Live |
+| `TradeRecord` | ein Trade-Log-Format für Backtest, Demo und Live |
 
-Ablauf je Bar, in dieser Reihenfolge: Handelstag fortschreiben → Ausstiege aus den Tagesregeln
-→ Ausstiegswunsch der Strategie → erst danach ein neuer Einstieg durch das `RiskGate`.
-Stop- und Zieltreffer erzeugt die Schicht **nicht** — dafür braucht es die Kursbewegung
-innerhalb der Bar, die nur der Host kennt.
+Ablauf je Bar: Handelstag fortschreiben → Ausstiege aus den Tagesregeln → Ausstiegswunsch der
+Strategie → erst danach ein neuer Einstieg durch das `RiskGate`.
 
-### Positionsgröße
+Positionsgröße: `Größe = Risikobetrag / (Stopabstand × Punktwert je Einheit)`, immer **abgerundet**
+auf die Schrittweite. Passt nicht einmal die Mindestgröße ins Budget, wird der Trade abgelehnt
+statt verkleinert.
 
+**Nicht konfigurierbar** sind Pflicht-Stop-Loss, kein Halten über Nacht und kein Nachkaufen in
+Verlustpositionen. Das sind Regeln, keine Einstellungen; ein Schalter dafür wäre genau die Lücke,
+die diese Schicht schließen soll.
+
+## Datenpipeline (`Daytrading.Data`)
+
+`IDataProvider` mit drei Implementierungen:
+
+| Quelle | Abdeckung | Hinweis |
+|---|---|---|
+| `BinancePublicDataProvider` | Krypto, 1m, vollständige Historie | kostenlos, Monats- und Tagesarchive, lokaler Cache |
+| `CsvFileDataProvider` | alles, was der Export-cBot schreibt | **Referenzquelle** mit der Preisstellung des eigenen Brokers |
+| `OandaDataProvider` | Metalle, Rohstoffe, Indizes | misst den historischen Spread aus Bid- und Ask-Kerzen; braucht einen Token |
+
+Der Weg: laden → normalisieren → prüfen → als Parquet ablegen → Manifest und Qualitätsreport
+schreiben. Grundsätze:
+
+- **Lücken werden gemeldet, nie interpoliert.** Erfundene Bars erzeugen Trades, die es nie gab.
+- Duplikate mit identischen Werten sind harmlos; Duplikate mit **unterschiedlichen** Kursen
+  deuten auf vermischte Quellen und disqualifizieren das Symbol.
+- Maßstab für Vollständigkeit ist der **Sessionkalender**, nicht der Kalender: Wochenenden und
+  Feiertage sind keine Lücken. US-Börsenfeiertage werden aus Regeln berechnet, inklusive
+  Karfreitag und der Verschiebung von Wochenendfeiertagen.
+- Gespeichert wird die feinste Auflösung der Quelle, partitioniert nach Symbol, Timeframe und
+  Jahr. Gröberes entsteht beim Laden durch Aggregation — der umgekehrte Weg existiert nicht.
+- Symbole unterhalb der Mindestqualität fliegen aus dem Backtest und werden im Report benannt.
+
+## Backtester (`Daytrading.Backtester`)
+
+Ausführungsregeln, bewusst so und nicht anders:
+
+- **Einstiege frühestens auf der Open der Folgebar.** Auf dem Close der Signalbar auszuführen
+  wäre Look-ahead.
+- **Zeitgesteuerte Ausstiege auf dem Close der laufenden Bar.** Sie hängen nicht vom Kurs ab,
+  verschaffen also keinen Informationsvorteil — und aufgeschoben würden sie „kein Overnight"
+  brechen.
+- **Stop und Ziel in derselben Bar: der Stop gilt als zuerst erreicht.** Der Verlauf innerhalb
+  der Bar ist unbekannt; die pessimistische Annahme ist die einzige, die nicht schönrechnet.
+- **Kurslücken über den Stop hinweg werden zum Eröffnungskurs gefüllt.** Ein Stop ist keine
+  Garantie.
+- **Swap wird ignoriert** — ohne Overnight-Positionen fällt keiner an.
+
+Kostenmodell: Kursdaten gelten als Mittelkurs, gekauft wird zum Brief und verkauft zum Geld
+(ein Hin und Zurück kostet einen vollen Spread), in den Randzeiten der Session mit dem
+konfigurierten Faktor multipliziert. Slippage wirkt immer gegen die Position, bei Stops stärker,
+bei Limits gar nicht.
+
+Kennzahlen je Kombination: Nettoergebnis, Max Drawdown in Betrag und Prozent, Profitfaktor,
+Sharpe, Sortino, Trefferquote, Erwartungswert je Trade und in R, Anzahl Trades, durchschnittliche
+Haltedauer, längste Verlustserie, Ergebnis je Wochentag und Stunde — und die Zahl der
+**Kalenderwochen bis zur Mindeststichprobe**, damit unrealistisch langsame Kombinationen auffallen.
+
+Die Walk-Forward-Analyse wählt Parameter auf einem Trainingsfenster und misst sie im folgenden,
+unangetasteten Fenster. Das Erwartungsprofil entsteht ausschließlich aus diesen
+Out-of-Sample-Fenstern. Die Auswahl bevorzugt nicht den höchsten Gewinn, sondern den
+Erwartungswert bei ausreichender Stichprobe — der beste Lauf aus vier Trades ist keiner.
+
+Die Regime-Auswertung ordnet jedem Handelstag Volatilität und Trendrichtung zu (Terzile über den
+Zeitraum) und wertet die Trades danach aus. Das ist eine Auswertung im Nachhinein und fließt in
+keine Handelsentscheidung ein.
+
+## Bewertungsschicht (`Daytrading.Evaluation`)
+
+Das `ExpectationProfile` aus der Walk-Forward-Analyse ist der Maßstab für den Demo- und
+Livebetrieb — in **R-Vielfachen** statt in Kontowährung, damit es nach Ein- oder Auszahlungen
+vergleichbar bleibt. Es wird beim Deployment eingefroren.
+
+`StrategyHealthMonitor` hält den Betrieb dagegen und kennt vier Zustände:
+
+| Zustand | Bedeutung | Risikofaktor |
+|---|---|---|
+| Healthy | im erwarteten Bereich | 1.0 |
+| Watch | auffällig, aber innerhalb der Streuung | 1.0 |
+| Degraded | messbar außerhalb der Erwartung | 0.5 |
+| Suspended | kein neuer Trade; offene Positionen laufen zu Ende | 0 |
+
+Auslöser: Drawdown über dem historischen Maximum, Verlustserie länger als je beobachtet,
+rollierender Erwartungswert unter dem unteren Konfidenzband, stark abweichende Handelsfrequenz.
+Ein abweichender Spread wird als **Ausführungsproblem** gemeldet und führt zu keiner
+Zustandsänderung — diese Unterscheidung entscheidet darüber, ob man den Broker wechselt oder die
+Strategie abschaltet.
+
+Vor jeder Verschlechterung steht eine **Mindeststichprobe**. Nach fünf schlechten Trades wird
+nichts abgeschaltet. Aus `Suspended` führt nur eine bestandene Neuvalidierung nach Abkühlphase
+zurück — und dann nach `Watch`, nicht direkt nach `Healthy`. Jede Zustandsänderung wird mit
+Zeitstempel, Auslöser und Datengrundlage protokolliert.
+
+Der Monitor ist **regelbasiert und nicht selbstoptimierend**: Er ändert keine Parameter, sondern
+senkt das Risiko, stoppt neue Trades oder meldet ein Ausführungsproblem.
+
+## cBot (`Daytrading.CBot`, `Daytrading.CBot.Export`)
+
+Zwei getrennte Assemblies, weil cTrader je Assembly genau einen Algo-Typ erlaubt.
+
+`DaytradingBot` übersetzt Bars in einen `MarketSnapshot`, fragt die gewählte Strategie, lässt die
+Ausführungsschicht entscheiden und führt deren Anweisungen aus. `OnBar` ruft cTrader auf, wenn
+eine neue Bar beginnt — die vorherige also gerade geschlossen hat. Entschieden wird auf dieser
+geschlossenen Bar, ausgeführt sofort: genau die Open der Folgebar, mit der auch der Backtester
+rechnet.
+
+Weil `ExecuteMarketOrder` nur Pips kennt, das Framework aber in Preisen rechnet, wird ohne Stop
+eröffnet und der Stop unmittelbar danach als absoluter Preis gesetzt. Schlägt das fehl, wird die
+Position sofort geschlossen — eine Position ohne Stop widerspricht der Grundregel.
+
+`BarExportBot` schreibt die Bars des Charts als CSV, mit Broker, Konto und Exportzeitpunkt in der
+Kopfzeile. Ohne diese Herkunft wäre die Datei als Referenz wertlos.
+
+## Tests
+
+```bash
+dotnet test
 ```
-Größe = Risikobetrag / (Stopabstand × Punktwert je Einheit)
-```
 
-Gerundet wird immer **nach unten** auf die Schrittweite des Symbols. Aufrunden würde das
-erlaubte Risiko bei jedem einzelnen Trade systematisch überschreiten. Passt nicht einmal die
-Mindestgröße ins Budget, wird der Trade abgelehnt statt verkleinert — eine Position unter der
-Mindestgröße gibt es nicht, eine über dem Risiko darf es nicht geben.
-
-### Ablehnungsgründe
-
-Jede Ablehnung trägt einen typisierten Grund und eine lesbare Begründung; stille Ablehnungen
-gibt es nicht. `MissingStopLoss` und `InvalidStopLoss` werden als **Fehler** protokolliert —
-das ist ein Fehler in der Strategie, kein Marktzustand:
-
-`NotAnEntrySignal`, `MissingStopLoss`, `InvalidStopLoss`, `OutsideTradingWindow`,
-`TooCloseToSessionEnd`, `TotalDrawdownLimit`, `DailyLossLimit`, `DailyDrawdownLimit`,
-`MaxTradesPerDay`, `MaxConcurrentPositions`, `AveragingDownNotAllowed`,
-`OpenRiskBudgetExhausted`, `PositionTooSmallForRiskBudget`.
-
-### Was bewusst nicht konfigurierbar ist
-
-Pflicht-Stop-Loss, kein Halten über Nacht und kein Nachkaufen in Verlustpositionen sind fest
-verdrahtet. Ein Konfigurationsschalter dafür wäre genau die Lücke, die diese Schicht schließen
-soll: eine falsch gesetzte Zeile könnte sonst abschalten, was das Framework garantiert.
-Ein Test wacht darüber, dass die Konfigurationsdatei keine Schlüssel enthält, die der Code
-nicht liest.
+313 Tests: Datentyp-Invarianten und Look-ahead-Freiheit, Verhalten und Determinismus beider
+Strategien, Positionsgröße und Risikobudget, Sessionregeln, Datenqualität und Aggregation,
+Ausführungsregeln des Backtests, Kennzahlen, Walk-Forward und die Zustandsübergänge der
+Bewertungsschicht.
 
 ## Plattformen
 
-Alles außer dem cBot ist reines .NET ohne native Abhängigkeiten und läuft auf Windows, macOS
-(Intel wie Apple Silicon) und Linux; die CI baut und testet auf allen vieren. Einrichtung,
-Details zu cTrader auf dem Mac und zum Dauerbetrieb: [`setup.md`](setup.md).
+Alles außer den cBots ist reines .NET ohne native Abhängigkeiten und läuft auf Windows, macOS
+(Intel wie Apple Silicon) und Linux; die CI baut und testet auf allen vieren. Einrichtung:
+[`setup.md`](setup.md). Betrieb und der Weg von Backtest zu Demo: [`betrieb.md`](betrieb.md).
 
-## Noch nicht gebaut
+## Noch offen
 
-Datenpipeline (Binance, OANDA, Datenqualitätsreport, Parquet-Cache), Backtester mit Kostenmodell
-und Walk-Forward, cBot-Adapter, Bewertungsschicht mit Erwartungsprofil und den Zuständen
-Healthy / Watch / Degraded / Suspended.
-
-Offen in der Ausführungsschicht: Korrelationsgruppen (zwei Positionen auf Gold und Silber sind
-rechnerisch zwei Trades, faktisch weitgehend einer) und das Kostenmodell für Spread, Kommission
-und Slippage, das zusammen mit dem Backtester entsteht.
+- Korrelationsgruppen für das gemeinsame Risiko verwandter Symbole
+- Kostenpflichtige Aktienquellen (Pi Trading, FirstRate) — erst nach bewusster Entscheidung
+- Automatischer monatlicher Walk-Forward-Lauf, der die Ergebnismatrix fortschreibt

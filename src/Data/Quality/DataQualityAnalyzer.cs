@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Daytrading.Data.Config;
+using Daytrading.Execution.Sessions;
 using Daytrading.Data.Normalization;
 using Daytrading.Strategies.Model;
 

@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Daytrading.Data.Config;
+using Daytrading.Execution.Sessions;
 using Daytrading.Data.Normalization;
 using Daytrading.Data.Providers;
 using Daytrading.Data.Quality;

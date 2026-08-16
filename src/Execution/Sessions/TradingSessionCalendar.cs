@@ -2,15 +2,18 @@ using System;
 using System.Collections.Generic;
 using Daytrading.Strategies.Model;
 
-namespace Daytrading.Data.Config;
+namespace Daytrading.Execution.Sessions;
 
 /// <summary>
 /// Liefert die Handelssession eines Symbols für einen beliebigen Zeitpunkt.
 /// </summary>
 /// <remarks>
 /// Die Session ist die Grundlage aller Tagesregeln: Eröffnungsrange, Zwangsschließung,
-/// Tagesverlustgrenze und Trade-Zähler hängen daran. Sie kommt aus der Symbolkonfiguration
-/// und wird vom Host berechnet - Strategien bekommen nur das fertige Ergebnis.
+/// Tagesverlustgrenze und Trade-Zähler hängen daran.
+///
+/// Der Kalender liegt bewusst in der Ausführungsschicht und nicht in der Datenschicht: Backtester
+/// <b>und</b> cBot müssen exakt dieselbe Sessiondefinition verwenden. Zwei Implementierungen
+/// wären der sicherste Weg, im Livebetrieb zu einem anderen Zeitpunkt flat zu gehen als im Test.
 /// </remarks>
 public interface ISessionCalendar
 {
@@ -27,8 +30,8 @@ public interface ISessionCalendar
     IEnumerable<TradingSession> Sessions(DateTime fromUtc, DateTime toUtc);
 }
 
-/// <summary>Sessionkalender aus einer <see cref="SymbolConfig"/>.</summary>
-public sealed class SymbolSessionCalendar : ISessionCalendar
+/// <summary>Sessionkalender aus Zeitzone, Handelszeiten, Handelstagen und Feiertagskalender.</summary>
+public class TradingSessionCalendar : ISessionCalendar
 {
     private readonly TimeZoneInfo _timeZone;
     private readonly TimeSpan _start;
@@ -36,28 +39,33 @@ public sealed class SymbolSessionCalendar : ISessionCalendar
     private readonly HashSet<DayOfWeek> _tradingDays;
     private readonly IHolidayCalendar _holidays;
 
-    public SymbolSessionCalendar(SymbolConfig config)
+    public TradingSessionCalendar(
+        TimeZoneInfo timeZone,
+        TimeSpan sessionStart,
+        TimeSpan sessionEnd,
+        IEnumerable<DayOfWeek> tradingDays,
+        IHolidayCalendar? holidays = null,
+        string symbolName = "")
     {
-        if (config == null)
+        _timeZone = timeZone ?? throw new ArgumentNullException(nameof(timeZone));
+        _start = sessionStart;
+        _end = sessionEnd;
+        _tradingDays = new HashSet<DayOfWeek>(tradingDays ?? throw new ArgumentNullException(nameof(tradingDays)));
+        _holidays = holidays ?? NoHolidayCalendar.Instance;
+
+        if (_tradingDays.Count == 0)
         {
-            throw new ArgumentNullException(nameof(config));
+            throw new ArgumentException($"{symbolName}: Ohne Handelstage gäbe es nie eine Session.", nameof(tradingDays));
         }
-
-        config.Validate();
-
-        _timeZone = ConfigParser.ResolveTimeZone(config.TimeZone, config.Name);
-        _start = ConfigParser.ParseTimeOfDay(config.SessionStart, config.Name);
-        _end = ConfigParser.ParseTimeOfDay(config.SessionEnd, config.Name);
-        _tradingDays = new HashSet<DayOfWeek>(ConfigParser.ParseTradingDays(config.TradingDays, config.AssetClass, config.Name));
-        _holidays = UsEquityHolidayCalendar.Resolve(config.HolidayCalendar);
 
         if (_end <= _start)
         {
             // Sessions über Mitternacht hinaus wären mit den Daytrading-Regeln unvereinbar:
             // "flat vor Sessionende" und "kein Overnight" würden sich widersprechen.
-            throw new MarketDataException(
-                $"{config.Name}: Sessionende {config.SessionEnd} liegt nicht nach dem Beginn {config.SessionStart}. " +
-                "Sessions über Mitternacht hinaus unterstützt das Framework bewusst nicht.");
+            throw new ArgumentException(
+                $"{symbolName}: Sessionende {sessionEnd} liegt nicht nach dem Beginn {sessionStart}. " +
+                "Sessions über Mitternacht hinaus unterstützt das Framework bewusst nicht.",
+                nameof(sessionEnd));
         }
     }
 
@@ -131,8 +139,8 @@ public sealed class SymbolSessionCalendar : ISessionCalendar
         // 24:00 meint Mitternacht des Folgetages; DateTime kann diese Uhrzeit nicht direkt tragen.
         var local = DateTime.SpecifyKind(localDate.Date, DateTimeKind.Unspecified) + timeOfDay;
 
-        // Während der Zeitumstellung kann eine Ortszeit doppelt oder gar nicht existieren.
-        // ConvertTimeToUtc wirft dann; wir weichen um eine Stunde aus, statt den Tag zu verlieren.
+        // Während der Zeitumstellung kann eine Ortszeit nicht existieren. ConvertTimeToUtc wirft
+        // dann; wir weichen um eine Stunde aus, statt den Handelstag zu verlieren.
         if (_timeZone.IsInvalidTime(local))
         {
             local = local.AddHours(1);

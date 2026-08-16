@@ -42,7 +42,7 @@ public static class StrategyRegistry
     {
         new StrategyRegistration(
             "OpeningRangeBreakout",
-            () => new OpeningRangeBreakoutStrategy(),
+            () => StrategyCatalog.Create("OpeningRangeBreakout"),
             Grid(
                 ("OpeningRangeMinutes", new[] { "15", "30", "60" }),
                 ("TakeProfitR", new[] { "1.5", "2", "3" }),
@@ -50,7 +50,7 @@ public static class StrategyRegistry
 
         new StrategyRegistration(
             "VwapReversion",
-            () => new VwapReversionStrategy(),
+            () => StrategyCatalog.Create("VwapReversion"),
             Grid(
                 ("BandSigma", new[] { "1.5", "2", "2.5" }),
                 ("StopAtrMultiple", new[] { "1", "1.5", "2" }),

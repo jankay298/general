@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Execution\Daytrading.Execution.csproj" />
     <ProjectReference Include="..\Strategies\Daytrading.Strategies.csproj" />
   </ItemGroup>
 
