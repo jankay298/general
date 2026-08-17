@@ -111,6 +111,19 @@ public static class StrategyRegistry
                 ("TakeProfitR", new[] { "1.5", "2", "3" }),
                 ("UseTrendFilter", new[] { "true", "false" }))),
 
+        // Dieselbe Idee wie LiquiditySweep, aber das Niveau ist ein bestaetigter Wendepunkt
+        // statt des tiefsten Tiefs der letzten n Bars. Ob diese Auswahl den Unterschied macht,
+        // ist der Gegenstand des Vergleichs.
+        new StrategyRegistration(
+            "StructureSweep",
+            () => StrategyCatalog.Create("StructureSweep"),
+            Grid(
+                ("PivotBars", new[] { "2", "3", "5" }),
+                ("MinTouches", new[] { "1", "2" }),
+                ("MaxLevelAgeBars", new[] { "100", "400" }),
+                ("TakeProfitR", new[] { "1.5", "2", "3" }),
+                ("UseTrendFilter", new[] { "true", "false" }))),
+
         // Der Massstab: Muenzwurf-Einstiege ueber dieselben Chance-Risiko-Verhaeltnisse.
         // Er beantwortet zwei Fragen auf einmal - was kostet das Handeln an sich, und
         // bringt ein festes Verhaeltnis von sich aus etwas.
