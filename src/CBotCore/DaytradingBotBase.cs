@@ -35,6 +35,8 @@ namespace Daytrading.CBot;
 public abstract class DaytradingBotBase : Robot
 {
     private readonly Dictionary<int, TradePlan> _plans = new Dictionary<int, TradePlan>();
+    private readonly Dictionary<RiskRejectionReason, int> _rejections =
+        new Dictionary<RiskRejectionReason, int>();
 
     private IStrategy _strategy = null!;
     private ExecutionEngine _engine = null!;
@@ -165,6 +167,8 @@ public abstract class DaytradingBotBase : Robot
 
         _timeframe = DetectTimeframe();
         _strategy = StrategyCatalog.Create(StrategyName);
+        PreloadHistory();
+        ReportCostFilter();
 
         var log = new CTraderLog(Print, Verbose);
         var parameters = StrategyCatalog.ParseParameters(StrategyParameterText);
@@ -240,6 +244,13 @@ public abstract class DaytradingBotBase : Robot
         {
             Apply(instruction);
         }
+
+        // Ein abgelehntes Einstiegssignal ist die haeufigste Ursache dafuer, dass ein Bot
+        // scheinbar nichts tut. Es darf nicht stumm verschwinden.
+        if (signal is { Kind: SignalKind.Entry } && _engine.LastDecision is { Accepted: false } decision)
+        {
+            ReportRejection(decision);
+        }
     }
 
     protected override void OnStop()
@@ -249,6 +260,101 @@ public abstract class DaytradingBotBase : Robot
         if (_monitor != null)
         {
             Print($"Zustand bei Stopp: {_monitor.State}, Risikofaktor {_monitor.RiskMultiplier}.");
+        }
+
+        foreach (var pair in _rejections)
+        {
+            Print($"Abgelehnte Einstiege - {pair.Key}: {pair.Value}");
+        }
+    }
+
+    /// <summary>
+    /// Füllt die Kursreihe mit der Historie, die im Chart bereits geladen ist.
+    /// </summary>
+    /// <remarks>
+    /// Ohne das beginnt der Bot bei null Bars und muss seine Aufwärmphase in Echtzeit
+    /// nachholen: Eine Strategie mit 120 Bars Vorlauf schweigt auf einem 5-Minuten-Chart zehn
+    /// Stunden lang. Das sah von außen aus wie ein Bot, der nicht handelt, und war doch nur
+    /// einer, der noch rechnet.
+    ///
+    /// Schlimmer als das Warten war die Abweichung: Der Backtester bekommt die volle Reihe,
+    /// der cBot fing bei null an. Damit lieferten dieselben Regeln auf denselben Kursen
+    /// verschiedene Ergebnisse - und der Backtest sagte nichts mehr über den Livebetrieb.
+    ///
+    /// Die laufende, noch nicht abgeschlossene Bar bleibt außen vor; übernommen wird nur, was
+    /// fertig ist.
+    /// </remarks>
+    private void PreloadHistory()
+    {
+        var wanted = Math.Max(_strategy.WarmupBars * 2, 200);
+        var available = Bars.Count - 1;              // ohne die laufende Bar
+        var take = Math.Min(wanted, Math.Max(0, available));
+
+        for (var i = take; i >= 1; i--)
+        {
+            var bar = Bars.Last(i);
+            _history.Append(CTraderBridge.ToCandle(bar));
+            _lastBarTime = DateTime.SpecifyKind(bar.OpenTime, DateTimeKind.Utc);
+        }
+
+        if (take < _strategy.WarmupBars)
+        {
+            Print(
+                $"WARNUNG: Nur {take} Bars Historie im Chart, {StrategyName} braucht {_strategy.WarmupBars}. " +
+                "Bis dahin kommen keine Signale. Im Chart weiter zurueckscrollen laedt mehr Historie.");
+        }
+        else
+        {
+            Print($"{take} Bars Historie uebernommen, Vorlauf von {StrategyName} ist gedeckt.");
+        }
+    }
+
+    /// <summary>
+    /// Rechnet die Kostengrenze in den Stopabstand um, den sie mindestens verlangt.
+    /// </summary>
+    /// <remarks>
+    /// Als Prozentzahl ist diese Einstellung nicht zu beurteilen: Ob "10 %" jeden Trade
+    /// durchlässt oder jeden ablehnt, hängt am Spread des Instruments und an der Größe der
+    /// Stops, die die Strategie setzt. Auf Gold im 5-Minuten-Takt liegt ein Stop von 1.5 ATR
+    /// bei rund 1.8 Punkten - bei 0.30 Spread sind das 16 %, und ein 10-%-Filter lehnt
+    /// wortlos alles ab.
+    ///
+    /// Deshalb steht die Zahl beim Start als Preisabstand im Log, wo sie mit dem Chart
+    /// vergleichbar ist.
+    /// </remarks>
+    private void ReportCostFilter()
+    {
+        if (MaxCostShareOfRiskPercent >= 100)
+        {
+            return;
+        }
+
+        var valuePerPoint = Symbol.PipSize > 0 ? Symbol.PipValue / Symbol.PipSize : 1d;
+        var costPerUnit = (Symbol.Spread * Math.Max(valuePerPoint, 0.0000001d)) + (2d * Math.Max(Symbol.Commission, 0d));
+        var minStop = costPerUnit / (MaxCostShareOfRiskPercent / 100d) / Math.Max(valuePerPoint, 0.0000001d);
+
+        Print(
+            $"Kostenfilter {MaxCostShareOfRiskPercent} %: Einstiege brauchen mindestens {minStop:0.#####} " +
+            $"Kursabstand zum Stop (Spread gerade {Symbol.Spread:0.#####}). Engere Stops werden abgelehnt.");
+    }
+
+    /// <summary>
+    /// Meldet, warum ein Signal nicht zu einem Trade wurde.
+    /// </summary>
+    /// <remarks>
+    /// Ein Bot, der ohne ein Wort nicht handelt, ist nicht zu beurteilen: Von außen sieht eine
+    /// abgelehnte Strategie genauso aus wie eine, die kein Signal hat, und wie ein Fehler. Die
+    /// erste Ablehnung je Grund wird deshalb immer gemeldet, danach jede fünfzigste - das
+    /// bleibt lesbar und geht trotzdem nicht unter.
+    /// </remarks>
+    private void ReportRejection(RiskDecision decision)
+    {
+        _rejections.TryGetValue(decision.Reason, out var seen);
+        _rejections[decision.Reason] = ++seen;
+
+        if (seen == 1 || seen % 50 == 0)
+        {
+            Print($"Kein Einstieg ({decision.Reason}, {seen}. Mal): {decision.Message}");
         }
     }
 
