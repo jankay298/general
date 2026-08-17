@@ -29,13 +29,17 @@ internal static class Fixture
         decimal minQuantity = 1m,
         decimal quantityStep = 1m,
         decimal maxQuantity = 1_000_000m,
-        decimal valuePerPricePointPerUnit = 1m) =>
+        decimal valuePerPricePointPerUnit = 1m,
+        decimal typicalSpread = 0m,
+        decimal commissionPerUnitPerSide = 0m) =>
         new ExecutionSymbol(
             new SymbolInfo("TEST", AssetClass.Equity, tickSize),
             minQuantity,
             quantityStep,
             maxQuantity,
-            valuePerPricePointPerUnit);
+            valuePerPricePointPerUnit,
+            typicalSpread,
+            commissionPerUnitPerSide);
 
     public static RiskLimits Limits() => RiskLimits.Default;
 

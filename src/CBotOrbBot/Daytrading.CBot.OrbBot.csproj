@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Ein Bot, eine Strategie. Eigenes Projekt, weil cTrader je Assembly genau einen
+       Algo-Typ erlaubt - und weil ein Konto genau eine Strategie halten soll. -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>Daytrading.CBot.OrbBot</AssemblyName>
+    <RootNamespace>Daytrading.CBot</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="cTrader.Automate" Version="1.0.19" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CBotCore\Daytrading.CBotCore.csproj" />
+  </ItemGroup>
+
+  <Target Name="CopyAlgoPackage" AfterTargets="_AlgoBuildAfterBuild">
+    <PropertyGroup>
+      <_DistDirectory>$(MSBuildThisFileDirectory)..\..\dist\</_DistDirectory>
+    </PropertyGroup>
+    <MakeDir Directories="$(_DistDirectory)" />
+    <Copy SourceFiles="$(OutDir)src.algo" DestinationFiles="$(_DistDirectory)OrbBot.algo"
+          Condition="Exists('$(OutDir)src.algo')" />
+    <Message Importance="high" Text="cTrader-Paket: $(_DistDirectory)OrbBot.algo"
+             Condition="Exists('$(OutDir)src.algo')" />
+  </Target>
+
+</Project>

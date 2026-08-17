@@ -20,6 +20,9 @@ public enum RiskRejectionReason
     OpenRiskBudgetExhausted,
     PositionTooSmallForRiskBudget,
 
+    /// <summary>Spread und Kommission fressen einen zu großen Teil des geplanten Risikos.</summary>
+    CostTooHighForStopDistance,
+
     /// <summary>Die Bewertungsschicht hat die Kombination abgeschaltet - kein neuer Trade.</summary>
     StrategySuspended,
 }

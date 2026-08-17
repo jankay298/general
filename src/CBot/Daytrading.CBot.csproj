@@ -20,9 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Evaluation\Daytrading.Evaluation.csproj" />
-    <ProjectReference Include="..\Execution\Daytrading.Execution.csproj" />
-    <ProjectReference Include="..\Strategies\Daytrading.Strategies.csproj" />
+    <ProjectReference Include="..\CBotCore\Daytrading.CBotCore.csproj" />
   </ItemGroup>
 
   <!-- Das SDK von cTrader benennt das Paket nach dem Ordner ueber dem Projekt, hier also

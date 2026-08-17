@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Gemeinsamer Unterbau aller Handels-cBots. Enthaelt keinen eigenen Algo-Typ: Die Basis
+       ist abstrakt und traegt kein [Robot]-Attribut, damit cTrader sie nicht als Bot zaehlt.
+
+       Auch hier steht KEINE Handelslogik. Die Klasse uebersetzt zwischen cAlgo und dem
+       Framework - Regeln gehoeren nach /Strategies oder /Execution. -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>Daytrading.CBotCore</AssemblyName>
+    <RootNamespace>Daytrading.CBot</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <AlgoBuild>false</AlgoBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="cTrader.Automate" Version="1.0.19" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Evaluation\Daytrading.Evaluation.csproj" />
+    <ProjectReference Include="..\Execution\Daytrading.Execution.csproj" />
+    <ProjectReference Include="..\Strategies\Daytrading.Strategies.csproj" />
+  </ItemGroup>
+
+</Project>

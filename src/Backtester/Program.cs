@@ -130,6 +130,7 @@ internal sealed class CommandLine
           --strategy <name>   Nur diese Strategie
           --balance <zahl>    Startkapital             (Vorgabe: 10000)
           --spread-factor <f> Spread-Annahmen skalieren, z.B. 0.1 oder 3 (Vorgabe: 1)
+          --max-cost-share <p> Einstiege ablehnen, wenn Kosten mehr als p % des Risikos sind (Vorgabe: 100 = aus)
           --verbose           Vollstaendige Fehlerausgabe
 
         Nur fuer ingest:
@@ -308,6 +309,10 @@ internal static class Commands
         }
 
         var limits = RiskLimits.Default;
+
+        // Kostenfilter: Einstiege ablehnen, deren Stop zu eng fuer den Spread ist. 100 heisst
+        // aus. Der Wert ist der Anteil des Risikos, den Spread und Kommission verbrauchen duerfen.
+        limits.MaxCostShareOfRiskPercent = arguments.GetDecimal("max-cost-share", 100m);
         limits.Validate();
 
         // Kostenannahmen skalieren: Die Spread-Angaben der Konfiguration sind Annahmen, solange

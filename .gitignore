@@ -34,5 +34,4 @@ appsettings.Local.json
 ## damit der Bot ohne installiertes .NET importierbar ist.
 /dist/*
 !/dist/README.md
-!/dist/DaytradingBot.algo
-!/dist/DaytradingBarExport.algo
+!/dist/*.algo

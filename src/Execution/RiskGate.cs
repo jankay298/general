@@ -106,6 +106,23 @@ public sealed class RiskGate
                     signal.StopLoss.Value, direction, signal.ReferencePrice, _symbol.Info.TickSize));
         }
 
+        // Rechnet sich dieser Trade überhaupt? Die Runde kostet einen Spread plus Kommission,
+        // unabhängig davon, wie eng der Stop sitzt. Ist der Stop zu eng, ist ein Teil des
+        // Risikos beim Einstieg schon ausgegeben - und dieser Teil muss zusätzlich verdient
+        // werden, bevor der Trade bei null steht.
+        if (_limits.MaxCostShareOfRiskPercent < 100m)
+        {
+            var costShare = CostShareOfRisk(stopDistance);
+            if (costShare > _limits.MaxCostShareOfRiskPercent)
+            {
+                return RiskDecision.Reject(
+                    RiskRejectionReason.CostTooHighForStopDistance,
+                    Format(
+                        "Spread und Kommission sind {0:0.0} % des Risikos (Stopabstand {1}), erlaubt sind {2} %.",
+                        costShare, stopDistance, _limits.MaxCostShareOfRiskPercent));
+            }
+        }
+
         if (!snapshot.IsInSession)
         {
             return RiskDecision.Reject(
@@ -251,6 +268,30 @@ public sealed class RiskGate
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Anteil des Risikos, der als Spread und Kommission anfällt - in Prozent des Stopabstands.
+    /// </summary>
+    /// <remarks>
+    /// Gerechnet wird je Einheit, damit die Positionsgröße herausfällt: Ein größerer Trade
+    /// zahlt mehr Kosten, riskiert aber im selben Verhältnis mehr. Das Verhältnis der beiden
+    /// hängt allein am Stopabstand - und genau darum geht es hier.
+    ///
+    /// Die Kommission wird für beide Seiten gezählt, weil der Trade auch wieder geschlossen wird.
+    /// </remarks>
+    private decimal CostShareOfRisk(decimal stopDistance)
+    {
+        if (stopDistance <= 0m)
+        {
+            return decimal.MaxValue;
+        }
+
+        var costPerUnit = _symbol.TypicalSpread * _symbol.ValuePerPricePointPerUnit
+                          + (2m * _symbol.CommissionPerUnitPerSide);
+        var riskPerUnit = stopDistance * _symbol.ValuePerPricePointPerUnit;
+
+        return riskPerUnit <= 0m ? decimal.MaxValue : costPerUnit / riskPerUnit * 100m;
     }
 
     private static string Format(string template, params object[] args) =>

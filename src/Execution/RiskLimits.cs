@@ -47,6 +47,25 @@ public sealed class RiskLimits
     public DrawdownBasis TotalDrawdownBasis { get; set; } = DrawdownBasis.TrailingPeak;
 
     /// <summary>
+    /// Größter Anteil des geplanten Risikos, den Spread und Kommission verbrauchen dürfen.
+    /// 100 schaltet die Prüfung ab.
+    /// </summary>
+    /// <remarks>
+    /// Der Grund, warum enge Stops verlieren, obwohl sie "wenig riskieren": Die Kosten hängen
+    /// nicht am Stopabstand, das Risiko schon. Bei einem Spread von 0.35 und einem Stop von
+    /// 0.70 sind die Hälfte der Runde schon weg, bevor der Kurs sich bewegt hat - so ein Trade
+    /// braucht eine Trefferquote, die keine Strategie liefert.
+    ///
+    /// Anders als eine Mindest-Stopweite in Punkten passt sich diese Grenze von selbst an
+    /// Instrument und Marktlage an: Bei weitem Spread verlangt sie einen weiteren Stop.
+    ///
+    /// Bewusst in der Ausführungsschicht: Die Strategie kennt weder Spread noch Kommission,
+    /// und soll es auch nicht. Sie liefert eine Handelsabsicht, hier wird entschieden, ob die
+    /// sich rechnen kann.
+    /// </remarks>
+    public decimal MaxCostShareOfRiskPercent { get; set; } = 100m;
+
+    /// <summary>
     /// Reines Sicherheitsnetz gegen viele Kleinstpositionen. Die bindende Grenze für parallele
     /// Trades ist <see cref="MaxOpenRiskPercent"/>, nicht diese Zahl.
     /// </summary>
