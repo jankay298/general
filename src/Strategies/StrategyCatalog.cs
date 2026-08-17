@@ -23,6 +23,11 @@ public static class StrategyCatalog
         {
             ["OpeningRangeBreakout"] = () => new OpeningRangeBreakoutStrategy(),
             ["VwapReversion"] = () => new VwapReversionStrategy(),
+
+            // Die gespiegelten Fassungen. Sie beantworten die Frage, ob ein Verlust aus der
+            // Richtung kommt oder aus den Kosten - siehe InvertedStrategy.
+            ["InvertedOpeningRangeBreakout"] = () => new InvertedStrategy(new OpeningRangeBreakoutStrategy()),
+            ["InvertedVwapReversion"] = () => new InvertedStrategy(new VwapReversionStrategy()),
         };
 
     public static IReadOnlyList<string> Names => Factories.Keys.OrderBy(name => name, StringComparer.Ordinal).ToList();

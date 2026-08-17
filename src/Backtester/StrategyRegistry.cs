@@ -55,6 +55,25 @@ public static class StrategyRegistry
                 ("BandSigma", new[] { "1.5", "2", "2.5" }),
                 ("StopAtrMultiple", new[] { "1", "1.5", "2" }),
                 ("MaxEntriesPerDay", new[] { "1", "2" }))),
+
+        // Dieselben Strategien mit gedrehter Richtung, auf demselben Parameterraum. Sie
+        // beantworten eine einzige Frage: Kommt der Verlust aus der Richtung oder aus den
+        // Kosten? Sind beide Fassungen negativ, sind es die Kosten.
+        new StrategyRegistration(
+            "InvertedOpeningRangeBreakout",
+            () => StrategyCatalog.Create("InvertedOpeningRangeBreakout"),
+            Grid(
+                ("OpeningRangeMinutes", new[] { "15", "30", "60" }),
+                ("TakeProfitR", new[] { "1.5", "2", "3" }),
+                ("StopLossMode", new[] { "OppositeRangeSide", "AtrMultiple" }))),
+
+        new StrategyRegistration(
+            "InvertedVwapReversion",
+            () => StrategyCatalog.Create("InvertedVwapReversion"),
+            Grid(
+                ("BandSigma", new[] { "1.5", "2", "2.5" }),
+                ("StopAtrMultiple", new[] { "1", "1.5", "2" }),
+                ("MaxEntriesPerDay", new[] { "1", "2" }))),
     };
 
     public static StrategyRegistration Get(string name) =>
