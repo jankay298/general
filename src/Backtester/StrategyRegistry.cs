@@ -90,6 +90,27 @@ public static class StrategyRegistry
                 ("StopAtrMultiple", new[] { "1", "1.5", "2" }),
                 ("TakeProfitR", new[] { "1.5", "2", "3" }))),
 
+        // Von Hand entwickelte Regeln, keine Lehrbuchindikatoren. Ruecklauf einer gemessenen
+        // Bewegung und das Abraeumen von Liquiditaet an einem sichtbaren Extrem.
+        new StrategyRegistration(
+            "ImpulsePullback",
+            () => StrategyCatalog.Create("ImpulsePullback"),
+            Grid(
+                ("MinImpulseAtr", new[] { "3", "6", "10" }),
+                ("ImpulseLookback", new[] { "24", "48" }),
+                ("MinRetracement", new[] { "0.38", "0.5" }),
+                ("MaxRetracement", new[] { "0.66", "0.8" }),
+                ("TakeProfitR", new[] { "1.5", "2", "3" }))),
+
+        new StrategyRegistration(
+            "LiquiditySweep",
+            () => StrategyCatalog.Create("LiquiditySweep"),
+            Grid(
+                ("SwingLookback", new[] { "10", "20", "40" }),
+                ("MinWickAtr", new[] { "0", "0.1", "0.3" }),
+                ("TakeProfitR", new[] { "1.5", "2", "3" }),
+                ("UseTrendFilter", new[] { "true", "false" }))),
+
         // Der Massstab: Muenzwurf-Einstiege ueber dieselben Chance-Risiko-Verhaeltnisse.
         // Er beantwortet zwei Fragen auf einmal - was kostet das Handeln an sich, und
         // bringt ein festes Verhaeltnis von sich aus etwas.

@@ -27,6 +27,8 @@ public static class StrategyCatalog
             ["TrendPullback"] = () => new TrendPullbackStrategy(),
             ["RsiReversal"] = () => new RsiReversalStrategy(),
             ["VolatilitySqueeze"] = () => new VolatilitySqueezeStrategy(),
+            ["ImpulsePullback"] = () => new ImpulsePullbackStrategy(),
+            ["LiquiditySweep"] = () => new LiquiditySweepStrategy(),
 
             // Keine Strategie, sondern der Vergleichsmassstab: Einstieg per Muenzwurf.
             ["RandomEntry"] = () => new RandomEntryStrategy(),
