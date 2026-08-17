@@ -399,9 +399,16 @@ internal static class Commands
 
         writer.WriteSummary(matrix, reports, options, notes);
 
+        // Jede Zerlegung gegen den Muenzwurf. Ohne diesen Massstab erzeugt das Durchsehen
+        // vieler Gruppen zuverlaessig Scheinfunde.
+        var allTrades = matrix.Results.SelectMany(result => result.Trades).ToList();
+        var baselinePath = Path.Combine(arguments.Get("results", "results"), "baseline.md");
+        File.WriteAllText(baselinePath, BaselineAnalysis.Report(allTrades));
+
         Console.WriteLine();
         Console.WriteLine($"{matrix.CombinationsTested} Kombinationen in {matrix.Duration.TotalSeconds:0.0} s gerechnet.");
         Console.WriteLine($"Matrix:        {writer.MatrixPath}");
+        Console.WriteLine($"Muenzwurf-Vergleich: {baselinePath}");
         Console.WriteLine($"Regime-Tabelle:{writer.RegimePath}");
         if (walkForward)
         {
