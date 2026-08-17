@@ -96,7 +96,10 @@
     "typicalSpread": 0.3,
     "commissionPerUnitPerSide": 0,
     "thinLiquiditySpreadFactor": 2.0,
-    "sourceSymbol": "XAU_USD"
+    "sourceSymbol": "XAU_USD",
+    "sourceSymbols": {
+      "dukascopy": "XAUUSD"
+    }
   },
   {
     "name": "US500",
@@ -114,7 +117,10 @@
     "typicalSpread": 0.5,
     "commissionPerUnitPerSide": 0,
     "thinLiquiditySpreadFactor": 1.5,
-    "sourceSymbol": "SPX500_USD"
+    "sourceSymbol": "SPX500_USD",
+    "sourceSymbols": {
+      "dukascopy": "USA500IDXUSD"
+    }
   },
   {
     "name": "AAPL",
@@ -149,7 +155,10 @@
     "valuePerPricePointPerUnit": 1,
     "typicalSpread": 0.02,
     "commissionPerUnitPerSide": 0,
-    "thinLiquiditySpreadFactor": 2.0
+    "thinLiquiditySpreadFactor": 2.0,
+    "sourceSymbols": {
+      "dukascopy": "XAGUSD"
+    }
   },
   {
     "name": "NAS100",
@@ -167,6 +176,9 @@
     "valuePerPricePointPerUnit": 1,
     "typicalSpread": 1.5,
     "commissionPerUnitPerSide": 0,
-    "thinLiquiditySpreadFactor": 1.5
+    "thinLiquiditySpreadFactor": 1.5,
+    "sourceSymbols": {
+      "dukascopy": "USATECHIDXUSD"
+    }
   }
 ]

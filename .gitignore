@@ -12,6 +12,10 @@ TestResults/
 *.coverage
 *.nupkg
 
+## Das SDK von cTrader legt neben dem Build eine Kopie des Pakets ab. Die gehoert nicht
+## ins Repository - die auslieferbare Fassung liegt unter /dist.
+cAlgo/
+
 ## Marktdaten und Ergebnisse werden nicht eingecheckt.
 ## Rohdaten sind zu groß, Ergebnisse werden reproduzierbar erzeugt.
 /data/**
@@ -25,3 +29,10 @@ TestResults/
 *.secrets.json
 appsettings.Local.json
 .env
+
+## Fertige cTrader-Pakete. Eine davon wird bewusst mitgeliefert (siehe dist/README.md),
+## damit der Bot ohne installiertes .NET importierbar ist.
+/dist/*
+!/dist/README.md
+!/dist/DaytradingBot.algo
+!/dist/DaytradingBarExport.algo

@@ -80,7 +80,8 @@ public sealed class DataPipeline
 
         config.Validate();
 
-        var request = new DataRequest(config.SourceName, provider.NativeTimeframe, fromUtc, toUtc);
+        var sourceName = config.SourceNameFor(provider.Name);
+        var request = new DataRequest(sourceName, provider.NativeTimeframe, fromUtc, toUtc);
         var raw = await provider.GetBarsAsync(request, cancellationToken).ConfigureAwait(false);
         var bars = BarNormalizer.Normalize(raw, out var normalization);
 
@@ -96,7 +97,7 @@ public sealed class DataPipeline
         var manifest = new SymbolManifest
         {
             Symbol = config.Name,
-            SourceSymbol = config.SourceName,
+            SourceSymbol = sourceName,
             Source = provider.Name,
             StoredTimeframe = provider.NativeTimeframe.ToString(),
             WorkingTimeframe = config.WorkingTimeframe,

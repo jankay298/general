@@ -133,8 +133,9 @@ internal sealed class CommandLine
           --verbose           Vollstaendige Fehlerausgabe
 
         Nur fuer ingest:
-          --source binance|csv|oanda   Datenquelle (Vorgabe: binance)
+          --source binance|dukascopy|csv|oanda   Datenquelle (Vorgabe: binance)
           --csv <pfad>                 Verzeichnis mit CSV-Dateien (fuer source=csv)
+          --throttle <ms>              Pause zwischen Downloads (Vorgabe: 250, nur dukascopy)
 
         Nur fuer walkforward:
           --train <tage>      Laenge des Trainingsfensters (Vorgabe: 180)
@@ -171,6 +172,11 @@ internal static class Commands
                 "binance" => new BinancePublicDataProvider(downloader, Path.Combine(dataRoot, "raw", "binance")),
                 "csv" => new CsvFileDataProvider(arguments.Get("csv", Path.Combine(dataRoot, "raw", "csv")), symbol.ToTimeframe()),
                 "oanda" => new OandaDataProvider(),
+                "dukascopy" => new DukascopyDataProvider(
+                    downloader,
+                    Path.Combine(dataRoot, "raw", "dukascopy", symbol.SourceNameFor("dukascopy")),
+                    DukascopyDataProvider.PriceScaleFor(symbol.SourceNameFor("dukascopy")),
+                    arguments.GetInt("throttle", 250)),
                 var other => throw new ArgumentException($"Unbekannte Quelle '{other}'."),
             };
 
@@ -181,6 +187,47 @@ internal static class Commands
                 $"  {result.Report.BarCount} Bars, Status {result.Report.Status}, " +
                 $"{result.Report.MissingBars} fehlend ({result.Report.MissingPercent:0.00} %)");
             Console.WriteLine($"  Bericht: {result.ReportPath}");
+
+            if (provider is DukascopyDataProvider dukascopy)
+            {
+                // Der gemessene Spread ist der eigentliche Grund für diese Quelle - er gehört
+                // sichtbar in die Ausgabe, damit er mit dem Wert in symbols.json vergleichbar ist.
+                if (dukascopy.LastSpreadStatistics is { } spread)
+                {
+                    Console.WriteLine(
+                        $"  Gemessener Spread aus {spread.SampleCount} Bars: " +
+                        $"Median {spread.Median:0.#####}, Mittel {spread.Average:0.#####}, " +
+                        $"Maximum {spread.Maximum:0.#####} " +
+                        $"(Annahme in symbols.json: {symbol.TypicalSpread:0.#####})");
+                }
+
+                Console.WriteLine(
+                    $"  {dukascopy.PaddingMinutesDropped} Auffuell-Minuten ohne Volumen verworfen, " +
+                    $"{dukascopy.DaysWithoutData.Count} Tage ohne Daten.");
+
+                if (dukascopy.DaysFailed.Count > 0)
+                {
+                    // Diese Tage fehlen wegen einer Stoerung, nicht weil der Markt zu war. Der
+                    // Unterschied entscheidet, ob das Ergebnis belastbar ist.
+                    Console.WriteLine(
+                        $"  ACHTUNG: {dukascopy.DaysFailed.Count} Tage konnten nicht geladen werden " +
+                        "(Netz oder Drosselung), sie fehlen in den Daten.");
+
+                    foreach (var failure in dukascopy.DaysFailed.Take(5))
+                    {
+                        Console.WriteLine($"    {failure.DayUtc:yyyy-MM-dd}: {failure.Reason}");
+                    }
+
+                    if (dukascopy.DaysFailed.Count > 5)
+                    {
+                        Console.WriteLine($"    ... und {dukascopy.DaysFailed.Count - 5} weitere.");
+                    }
+
+                    Console.WriteLine(
+                        "    Denselben Befehl noch einmal ausfuehren - Geladenes liegt im Cache, " +
+                        "nur die Luecken werden nachgeholt.");
+                }
+            }
 
             if (!result.IsUsable)
             {

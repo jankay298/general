@@ -19,6 +19,17 @@ public sealed class SymbolConfig
     /// <summary>Name bei der Datenquelle, falls abweichend (z.B. BTCUSDT bei Binance).</summary>
     public string? SourceSymbol { get; set; }
 
+    /// <summary>
+    /// Abweichende Namen je Datenquelle, z.B. <c>{"oanda": "XAU_USD", "dukascopy": "XAUUSD"}</c>.
+    /// </summary>
+    /// <remarks>
+    /// Jede Quelle benennt dieselben Instrumente anders, und dasselbe Symbol wird aus mehreren
+    /// Quellen geladen - zum Vergleich und als Rückfallebene. Ein einzelnes Feld reicht dafür
+    /// nicht. <see cref="SourceSymbol"/> bleibt der Wert für alle nicht aufgeführten Quellen.
+    /// </remarks>
+    public Dictionary<string, string> SourceSymbols { get; set; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
     public AssetClass AssetClass { get; set; }
 
     /// <summary>IANA-Zeitzone der Börse, z.B. "America/New_York". Für Krypto irrelevant.</summary>
@@ -64,6 +75,14 @@ public sealed class SymbolConfig
     public Timeframe ToTimeframe() => ConfigParser.ParseTimeframe(WorkingTimeframe, Name);
 
     public string SourceName => string.IsNullOrWhiteSpace(SourceSymbol) ? Name : SourceSymbol!;
+
+    /// <summary>Name des Symbols bei einer bestimmten Quelle.</summary>
+    public string SourceNameFor(string providerName) =>
+        !string.IsNullOrWhiteSpace(providerName)
+        && SourceSymbols.TryGetValue(providerName, out var mapped)
+        && !string.IsNullOrWhiteSpace(mapped)
+            ? mapped
+            : SourceName;
 
     public void Validate()
     {

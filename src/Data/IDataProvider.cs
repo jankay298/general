@@ -68,7 +68,7 @@ public interface IDataProvider
 }
 
 /// <summary>Fehler beim Beschaffen oder Lesen von Marktdaten.</summary>
-public sealed class MarketDataException : Exception
+public class MarketDataException : Exception
 {
     public MarketDataException(string message)
         : base(message)
@@ -76,6 +76,28 @@ public sealed class MarketDataException : Exception
     }
 
     public MarketDataException(string message, Exception inner)
+        : base(message, inner)
+    {
+    }
+}
+
+/// <summary>
+/// Die Daten waren nicht erreichbar - Zeitüberschreitung, Verbindungsabbruch, Drosselung.
+/// </summary>
+/// <remarks>
+/// Eigener Typ, weil daraus eine andere Entscheidung folgt als aus einem Formatfehler: Eine
+/// Störung auf der Leitung darf einen mehrjährigen Abruf nicht beenden, ein unerwartetes
+/// Dateiformat dagegen muss ihn beenden - dann stimmt eine Annahme über die Quelle nicht mehr,
+/// und alles Weitere wäre geraten.
+/// </remarks>
+public sealed class MarketDataUnavailableException : MarketDataException
+{
+    public MarketDataUnavailableException(string message)
+        : base(message)
+    {
+    }
+
+    public MarketDataUnavailableException(string message, Exception inner)
         : base(message, inner)
     {
     }

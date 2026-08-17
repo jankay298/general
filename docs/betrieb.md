@@ -24,13 +24,32 @@ Ergebnis hier das erwartete.
 # Krypto, kostenlos und ohne Zugangsdaten
 dotnet run --project src/Backtester -- ingest --symbol BTCUSD --from 2022-01-01 --to 2025-01-01
 
-# Metalle, Rohstoffe, Indizes (Token als Umgebungsvariable, nie im Repository)
+# Metalle, Indizes, Währungen — ebenfalls ohne Anmeldung, mit gemessenem Spread
+dotnet run --project src/Backtester -- ingest --source dukascopy --symbol XAUUSD --from 2023-01-01 --to 2025-01-01
+
+# Dieselben Instrumente über OANDA (braucht einen Token, siehe unten)
 export OANDA_API_TOKEN=...
 dotnet run --project src/Backtester -- ingest --source oanda --symbol XAUUSD --from 2022-01-01 --to 2025-01-01
 
 # Brokerdaten aus dem Export-cBot
 dotnet run --project src/Backtester -- ingest --source csv --csv data/raw/csv --symbol US500
 ```
+
+**Dukascopy ist die Quelle der ersten Wahl für alles außer Krypto und Aktien.** Sie braucht
+weder Konto noch Token und liefert Geld- und Briefkurs getrennt — der Spread wird damit
+*gemessen* statt geschätzt. Bei Haltedauern von Minuten ist das die Größe, an der das Ergebnis
+hängt. Zwei Beobachtungen aus der Praxis:
+
+- Der Abruf läuft bewusst langsam (`--throttle`, Vorgabe 250 ms). Ein Jahr eines Instruments
+  sind rund 500 Dateien. Wird zu schnell geladen, antwortet der Server mit HTTP 429.
+- Einzelne Tage scheitern an Zeitüberschreitungen. Der Lauf bricht deswegen nicht ab, sondern
+  meldet sie am Ende und lädt beim nächsten Aufruf nur die Lücken nach — alles Geladene liegt
+  unter `data/raw/dukascopy/`. **Denselben Befehl einfach noch einmal ausführen**, bis keine
+  Fehltage mehr gemeldet werden.
+
+Der gemessene Spread wird nach dem Abruf ausgegeben und mit dem Wert in `config/symbols.json`
+verglichen. Weicht er ab, gilt der gemessene: Für XAUUSD standen dort 0.30, gemessen wurden
+im Mittel 0.396 — ein Drittel mehr Kosten je Trade, als der Backtest angenommen hätte.
 
 Nach jedem Lauf steht in `results/data-quality/<symbol>.md`, was mit den Daten nicht stimmt.
 Symbole mit Status `Rejected` fliegen aus dem Backtest — das ist gewollt und wird benannt, statt
@@ -57,12 +76,14 @@ Was in `results/summary.md` zuerst zu lesen ist:
 
 ## 4. Die cBots in cTrader einrichten
 
-Beide Projekte in cTrader kompilieren (oder die erzeugte `.algo` laden):
+Die fertigen Pakete liegen unter `dist/` und werden in cTrader importiert; wer lieber selbst
+baut, öffnet die Projekte in cTrader. Die ausführliche Klickanleitung steht in
+[`dist/README.md`](../dist/README.md).
 
-| Projekt | Zweck |
-|---|---|
-| `src/CBotExport` | schreibt Bars als CSV — einmal je Symbol und Zeitrahmen |
-| `src/CBot` | handelt eine Strategie auf einem Konto |
+| Projekt | Paket | Zweck |
+|---|---|---|
+| `src/CBotExport` | `dist/DaytradingBarExport.algo` | schreibt Bars als CSV — einmal je Symbol und Zeitrahmen |
+| `src/CBot` | `dist/DaytradingBot.algo` | handelt eine Strategie auf einem Konto |
 
 **Ein Konto, eine Strategie, ein Symbol.** Nur so bleiben die Ergebnisse getrennt vergleichbar,
 und nur so gelten die Kontogrenzen für genau das, was sie begrenzen sollen.

@@ -25,4 +25,21 @@
     <ProjectReference Include="..\Strategies\Daytrading.Strategies.csproj" />
   </ItemGroup>
 
+  <!-- Das SDK von cTrader benennt das Paket nach dem Ordner ueber dem Projekt, hier also
+       "src.algo". Der Name steht im Dateisystem des Anwenders, nicht im Paket - cTrader liest
+       den Robotnamen aus den Metadaten -, deshalb wird die fertige Datei unter einem
+       sprechenden Namen nach /dist kopiert. Das ist die Datei zum Importieren. -->
+  <Target Name="CopyAlgoPackage" AfterTargets="Build">
+    <PropertyGroup>
+      <_DistDirectory>$(MSBuildThisFileDirectory)..\..\dist\</_DistDirectory>
+    </PropertyGroup>
+    <MakeDir Directories="$(_DistDirectory)" />
+    <Copy SourceFiles="$(OutDir)src.algo"
+          DestinationFiles="$(_DistDirectory)DaytradingBot.algo"
+          Condition="Exists('$(OutDir)src.algo')" />
+    <Message Importance="high"
+             Text="cTrader-Paket: $(_DistDirectory)DaytradingBot.algo"
+             Condition="Exists('$(OutDir)src.algo')" />
+  </Target>
+
 </Project>

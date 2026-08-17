@@ -13,4 +13,19 @@
     <PackageReference Include="cTrader.Automate" Version="1.0.19" />
   </ItemGroup>
 
+  <!-- Siehe Daytrading.CBot.csproj: das SDK benennt das Paket nach dem Ordner ueber dem
+       Projekt. Beide Projekte liegen unter /src und wuerden dieselbe Datei erzeugen. -->
+  <Target Name="CopyAlgoPackage" AfterTargets="Build">
+    <PropertyGroup>
+      <_DistDirectory>$(MSBuildThisFileDirectory)..\..\dist\</_DistDirectory>
+    </PropertyGroup>
+    <MakeDir Directories="$(_DistDirectory)" />
+    <Copy SourceFiles="$(OutDir)src.algo"
+          DestinationFiles="$(_DistDirectory)DaytradingBarExport.algo"
+          Condition="Exists('$(OutDir)src.algo')" />
+    <Message Importance="high"
+             Text="cTrader-Paket: $(_DistDirectory)DaytradingBarExport.algo"
+             Condition="Exists('$(OutDir)src.algo')" />
+  </Target>
+
 </Project>

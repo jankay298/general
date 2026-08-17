@@ -45,6 +45,24 @@ public sealed class HttpFileDownloader : IFileDownloader, IDisposable
                     return null;
                 }
 
+                if ((int)response.StatusCode == 429)
+                {
+                    // Drosselung. Dukascopy antwortet darauf schnell und hart; hier hilft nur warten.
+                    // Wenn der Server sagt, wie lange, halten wir uns daran.
+                    var wait = response.Headers.RetryAfter?.Delta
+                               ?? TimeSpan.FromSeconds(Math.Min(60, 5 * Math.Pow(2, attempt - 1)));
+
+                    if (attempt < _maxAttempts)
+                    {
+                        await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    throw new MarketDataUnavailableException(
+                        $"'{url}' wurde nach {_maxAttempts} Versuchen weiterhin gedrosselt (HTTP 429). " +
+                        "Weniger parallele Anfragen oder größere Pause einstellen.");
+                }
+
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
             }
@@ -60,7 +78,8 @@ public sealed class HttpFileDownloader : IFileDownloader, IDisposable
             }
         }
 
-        throw new MarketDataException($"Download von '{url}' ist nach {_maxAttempts} Versuchen fehlgeschlagen.", last!);
+        throw new MarketDataUnavailableException(
+            $"Download von '{url}' ist nach {_maxAttempts} Versuchen fehlgeschlagen.", last!);
     }
 
     public void Dispose()
