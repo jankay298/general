@@ -217,13 +217,13 @@ public sealed class BacktestRunner
 
             // Der Gesamt-Drawdown ist erreicht: Nach den Regeln wird die Strategie gestoppt und
             // geprueft. Also endet auch der Lauf hier, statt jahrelang ohne Trades weiterzuzaehlen.
-            if (account.TotalDrawdownPercent >= job.Limits.MaxTotalDrawdownPercent)
+            if (account.TotalDrawdownPercentFor(job.Limits.TotalDrawdownBasis) >= job.Limits.MaxTotalDrawdownPercent)
             {
                 stoppedAt = barClose;
                 stopReason = string.Format(
                     CultureInfo.InvariantCulture,
                     "Gesamt-Drawdown {0:0.00} % erreicht die Grenze von {1} % (Hoch {2:0.00}, Equity {3:0.00}).",
-                    account.TotalDrawdownPercent, job.Limits.MaxTotalDrawdownPercent,
+                    account.TotalDrawdownPercentFor(job.Limits.TotalDrawdownBasis), job.Limits.MaxTotalDrawdownPercent,
                     account.PeakEquity, account.Equity);
                 warnings.Add(string.Format(
                     CultureInfo.InvariantCulture,

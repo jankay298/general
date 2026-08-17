@@ -23,6 +23,7 @@ public sealed class AccountState
                 nameof(startingBalance), startingBalance, "Startkapital muss positiv sein.");
         }
 
+        InitialBalance = startingBalance;
         Balance = startingBalance;
         Equity = startingBalance;
         DayStartBalance = startingBalance;
@@ -59,8 +60,18 @@ public sealed class AccountState
     /// </summary>
     public decimal DailyDrawdownPercent => Percent(DayEquityHigh - Equity, DayStartBalance);
 
+    /// <summary>Startkapital. Bezugsgröße für Konten mit fester Verlustschwelle.</summary>
+    public decimal InitialBalance { get; }
+
     /// <summary>Rückgang vom historischen Equity-Hoch in Prozent.</summary>
     public decimal TotalDrawdownPercent => Percent(PeakEquity - Equity, PeakEquity);
+
+    /// <summary>Rückgang unter das Startkapital in Prozent. Über dem Startkapital null.</summary>
+    public decimal DrawdownFromInitialPercent => Percent(InitialBalance - Equity, InitialBalance);
+
+    /// <summary>Der Rückgang, der für die gewählte Bezugsgröße gilt.</summary>
+    public decimal TotalDrawdownPercentFor(DrawdownBasis basis) =>
+        basis == DrawdownBasis.InitialBalance ? DrawdownFromInitialPercent : TotalDrawdownPercent;
 
     /// <summary>
     /// Beginnt einen neuen Handelstag: setzt Tagesbezug, Tageshoch und Trade-Zähler zurück.

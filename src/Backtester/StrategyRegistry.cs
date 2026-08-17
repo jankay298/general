@@ -56,6 +56,40 @@ public static class StrategyRegistry
                 ("StopAtrMultiple", new[] { "1", "1.5", "2" }),
                 ("MaxEntriesPerDay", new[] { "1", "2" }))),
 
+        new StrategyRegistration(
+            "DonchianBreakout",
+            () => StrategyCatalog.Create("DonchianBreakout"),
+            Grid(
+                ("ChannelPeriod", new[] { "20", "40" }),
+                ("StopAtrMultiple", new[] { "1", "1.5", "2" }),
+                ("TakeProfitR", new[] { "1.5", "2", "3" }),
+                ("UseTrendFilter", new[] { "true", "false" }))),
+
+        new StrategyRegistration(
+            "TrendPullback",
+            () => StrategyCatalog.Create("TrendPullback"),
+            Grid(
+                ("FastMaPeriod", new[] { "20", "50" }),
+                ("StopAtrMultiple", new[] { "1", "1.5", "2" }),
+                ("TakeProfitR", new[] { "1.5", "2", "3" }))),
+
+        new StrategyRegistration(
+            "RsiReversal",
+            () => StrategyCatalog.Create("RsiReversal"),
+            Grid(
+                ("Oversold", new[] { "25", "30" }),
+                ("StopAtrMultiple", new[] { "1", "1.5", "2" }),
+                ("TakeProfitR", new[] { "1.5", "2", "3" }),
+                ("TradeWithTrend", new[] { "true", "false" }))),
+
+        new StrategyRegistration(
+            "VolatilitySqueeze",
+            () => StrategyCatalog.Create("VolatilitySqueeze"),
+            Grid(
+                ("SqueezeQuantile", new[] { "0.15", "0.25" }),
+                ("StopAtrMultiple", new[] { "1", "1.5", "2" }),
+                ("TakeProfitR", new[] { "1.5", "2", "3" }))),
+
         // Dieselben Strategien mit gedrehter Richtung, auf demselben Parameterraum. Sie
         // beantworten eine einzige Frage: Kommt der Verlust aus der Richtung oder aus den
         // Kosten? Sind beide Fassungen negativ, sind es die Kosten.

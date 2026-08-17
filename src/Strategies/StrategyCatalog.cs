@@ -23,11 +23,19 @@ public static class StrategyCatalog
         {
             ["OpeningRangeBreakout"] = () => new OpeningRangeBreakoutStrategy(),
             ["VwapReversion"] = () => new VwapReversionStrategy(),
+            ["DonchianBreakout"] = () => new DonchianBreakoutStrategy(),
+            ["TrendPullback"] = () => new TrendPullbackStrategy(),
+            ["RsiReversal"] = () => new RsiReversalStrategy(),
+            ["VolatilitySqueeze"] = () => new VolatilitySqueezeStrategy(),
 
             // Die gespiegelten Fassungen. Sie beantworten die Frage, ob ein Verlust aus der
             // Richtung kommt oder aus den Kosten - siehe InvertedStrategy.
             ["InvertedOpeningRangeBreakout"] = () => new InvertedStrategy(new OpeningRangeBreakoutStrategy()),
             ["InvertedVwapReversion"] = () => new InvertedStrategy(new VwapReversionStrategy()),
+            ["InvertedDonchianBreakout"] = () => new InvertedStrategy(new DonchianBreakoutStrategy()),
+            ["InvertedTrendPullback"] = () => new InvertedStrategy(new TrendPullbackStrategy()),
+            ["InvertedRsiReversal"] = () => new InvertedStrategy(new RsiReversalStrategy()),
+            ["InvertedVolatilitySqueeze"] = () => new InvertedStrategy(new VolatilitySqueezeStrategy()),
         };
 
     public static IReadOnlyList<string> Names => Factories.Keys.OrderBy(name => name, StringComparer.Ordinal).ToList();

@@ -125,13 +125,13 @@ public sealed class RiskGate
                     minutesLeft, _limits.ForceFlatMinutesBeforeSessionEnd));
         }
 
-        if (account.TotalDrawdownPercent >= _limits.MaxTotalDrawdownPercent)
+        if (account.TotalDrawdownPercentFor(_limits.TotalDrawdownBasis) >= _limits.MaxTotalDrawdownPercent)
         {
             return RiskDecision.Reject(
                 RiskRejectionReason.TotalDrawdownLimit,
                 Format(
                     "Gesamt-Drawdown {0:0.00}% erreicht die Grenze von {1}%. Die Strategie ist zu stoppen und zu prüfen.",
-                    account.TotalDrawdownPercent, _limits.MaxTotalDrawdownPercent));
+                    account.TotalDrawdownPercentFor(_limits.TotalDrawdownBasis), _limits.MaxTotalDrawdownPercent));
         }
 
         if (account.DailyLossPercent >= _limits.MaxDailyLossPercent)

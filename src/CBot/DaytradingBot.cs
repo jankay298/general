@@ -88,6 +88,9 @@ public class DaytradingBot : Robot
     [Parameter("Max. Gesamt-Drawdown %", DefaultValue = 10.0, MinValue = 0.01, MaxValue = 100, Group = "Risiko")]
     public double MaxTotalDrawdownPercent { get; set; } = 10.0;
 
+    [Parameter("Drawdown gemessen ab", DefaultValue = DrawdownBasis.TrailingPeak, Group = "Risiko")]
+    public DrawdownBasis TotalDrawdownBasis { get; set; } = DrawdownBasis.TrailingPeak;
+
     [Parameter("Max. gleichzeitige Positionen", DefaultValue = 5, MinValue = 1, Group = "Risiko")]
     public int MaxConcurrentPositions { get; set; } = 5;
 
@@ -137,6 +140,7 @@ public class DaytradingBot : Robot
             MaxDailyLossPercent = (decimal)MaxDailyLossPercent,
             MaxDailyDrawdownPercent = (decimal)MaxDailyDrawdownPercent,
             MaxTotalDrawdownPercent = (decimal)MaxTotalDrawdownPercent,
+            TotalDrawdownBasis = TotalDrawdownBasis,
             MaxConcurrentPositions = MaxConcurrentPositions,
             MaxTradesPerDay = MaxTradesPerDay,
             ForceFlatMinutesBeforeSessionEnd = ForceFlatMinutes,

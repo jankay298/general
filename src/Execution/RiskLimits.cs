@@ -40,8 +40,11 @@ public sealed class RiskLimits
     /// <summary>Rückgang vom höchsten Equity-Stand des laufenden Tages, realisiert und unrealisiert.</summary>
     public decimal MaxDailyDrawdownPercent { get; set; } = 4.0m;
 
-    /// <summary>Rückgang vom historischen Equity-Hoch. Danach wird die Strategie gestoppt.</summary>
+    /// <summary>Größter zulässiger Gesamtrückgang. Danach wird die Strategie gestoppt.</summary>
     public decimal MaxTotalDrawdownPercent { get; set; } = 10.0m;
+
+    /// <summary>Wovon der Gesamtrückgang gemessen wird.</summary>
+    public DrawdownBasis TotalDrawdownBasis { get; set; } = DrawdownBasis.TrailingPeak;
 
     /// <summary>
     /// Reines Sicherheitsnetz gegen viele Kleinstpositionen. Die bindende Grenze für parallele
