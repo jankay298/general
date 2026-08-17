@@ -93,7 +93,7 @@
     "quantityStep": 0.01,
     "maxQuantity": 500,
     "valuePerPricePointPerUnit": 1,
-    "typicalSpread": 0.35,
+    "typicalSpread": 0.3,
     "commissionPerUnitPerSide": 0,
     "thinLiquiditySpreadFactor": 2.0,
     "sourceSymbol": "XAU_USD",
