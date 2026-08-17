@@ -129,6 +129,7 @@ internal sealed class CommandLine
           --symbol <name>     Nur dieses Symbol
           --strategy <name>   Nur diese Strategie
           --balance <zahl>    Startkapital             (Vorgabe: 10000)
+          --spread-factor <f> Spread-Annahmen skalieren, z.B. 0.1 oder 3 (Vorgabe: 1)
           --verbose           Vollstaendige Fehlerausgabe
 
         Nur fuer ingest:
@@ -237,6 +238,27 @@ internal static class Commands
 
         var limits = RiskLimits.Default;
         limits.Validate();
+
+        // Kostenannahmen skalieren: Die Spread-Angaben der Konfiguration sind Annahmen, solange
+        // sie nicht aus dem Export des eigenen Brokers stammen. Mit --spread-factor lässt sich
+        // messen, wie sehr ein Ergebnis an dieser Annahme hängt - bei kurzen Haltedauern ist das
+        // oft die wichtigste Frage überhaupt.
+        var spreadFactor = arguments.GetDecimal("spread-factor", 1m);
+        if (spreadFactor <= 0m)
+        {
+            throw new ArgumentException("--spread-factor muss größer als 0 sein.");
+        }
+
+        if (spreadFactor != 1m)
+        {
+            foreach (var symbol in symbols)
+            {
+                symbol.Config.TypicalSpread *= spreadFactor;
+            }
+
+            notes.Add($"Spread-Annahmen mit Faktor {spreadFactor} skaliert (--spread-factor).");
+            Console.WriteLine($"Spread-Annahmen mit Faktor {spreadFactor} skaliert.");
+        }
 
         var options = new BacktestOptions
         {
