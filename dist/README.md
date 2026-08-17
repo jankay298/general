@@ -41,8 +41,37 @@ Die Parameter sind in Gruppen sortiert. Vorbelegt ist alles so, dass der Bot ohn
 | Parameter | Bedeutung |
 |---|---|
 | **Strategie** | `OpeningRangeBreakout` oder `VwapReversion` |
-| **Parameter** | Feineinstellung als `Name=Wert;Name=Wert`, z.B. `OpeningRangeMinutes=30;StopAtrFactor=1.5`. Leer lassen heißt: Vorgabewerte |
+| **Parameter** | Feineinstellung als `Name=Wert;Name=Wert`, z.B. `OpeningRangeMinutes=30;AtrStopMultiple=1.5`. Leer lassen heißt: Vorgabewerte |
 | **Anlageklasse** | `Equity`, `Index`, `Commodity` oder `Crypto` |
+
+Die möglichen Namen für das Parameterfeld. Ein Name, den die gewählte Strategie nicht liest,
+erscheint beim Start als Warnung im Log (`WARNUNG: Parameter '…' wird von … nicht gelesen`) —
+ein Tippfehler bleibt also nicht unbemerkt, stoppt den Bot aber auch nicht:
+
+**OpeningRangeBreakout** — handelt den Ausbruch aus der Eröffnungsspanne.
+
+| Name | Vorgabe | Bedeutung |
+|---|---|---|
+| `OpeningRangeMinutes` | 30 | Länge der Eröffnungsspanne in Minuten |
+| `BreakoutBufferTicks` | 0 | Aufschlag über der Spanne, bevor der Ausbruch zählt |
+| `StopLossMode` | `OppositeRangeSide` | oder `Atr` |
+| `AtrPeriod` | 14 | Periode der ATR |
+| `AtrStopMultiple` | 1.5 | Stopabstand in ATR, nur bei `StopLossMode=Atr` |
+| `TakeProfitR` | 2.0 | Ziel als Vielfaches des Risikos; 0 schaltet es ab |
+| `OneTradePerDay` | true | nur der erste Ausbruch des Tages |
+| `AllowLong` / `AllowShort` | true | Richtung einschränken |
+
+**VwapReversion** — handelt die Rückkehr zum VWAP nach einer Abweichung.
+
+| Name | Vorgabe | Bedeutung |
+|---|---|---|
+| `BandSigma` | 2.0 | Abweichung in Standardabweichungen, ab der eingestiegen wird |
+| `MinBarsForVwap` | 12 | Bars, bevor der VWAP als belastbar gilt |
+| `AtrPeriod` | 14 | Periode der ATR |
+| `StopAtrMultiple` | 1.5 | Stopabstand in ATR |
+| `MaxEntriesPerDay` | 2 | Einstiege je Tag |
+| `ExitAtVwap` | true | Ausstieg bei Erreichen des VWAP |
+| `AllowLong` / `AllowShort` | true | Richtung einschränken |
 
 ### Session
 
@@ -110,15 +139,25 @@ Der Bot läuft und hält sich an seine Regeln — das lässt sich auf dem Demoko
 Etwas anderes ist die Frage, ob er **Geld verdient**, und dazu ist der Stand ehrlich gesagt
 dieser:
 
-Auf 2,1 Millionen echten Minutenbars in Krypto (BTC, ETH, SOL, 2021–2024) hat **keine** der 108
-geprüften Kombinationen bestanden. Alle liefen in die Drawdown-Grenze, im Mittel nach 16 Tagen.
-Out-of-Sample waren 9 von 126 Fenstern profitabel. Der Erwartungswert lag zwischen −0.33 und
-−0.71 R je Trade.
+Geprüft auf echten Minutendaten — Krypto (BTC, ETH, SOL, 2021–2024, 2,1 Mio. Bars) und Gold
+(Januar bis April 2023, 114.238 Bars mit **gemessenem** Spread). 144 Kombinationen:
 
-Aufschlussreich war die Kostenrechnung: ohne Kosten liegt der Erwartungswert bei −0.006 R, also
-praktisch bei einem Münzwurf. Es sind Spread und Kommission, die daraus einen verlässlichen
-Verlust machen. Die beiden mitgelieferten Strategien haben **keinen Vorteil**, den sie bezahlen
-könnten.
+| | |
+|---|---|
+| Von der Drawdown-Grenze abgeschaltet | **144 von 144** |
+| Aktive Tage bis dahin (Median) | 20 |
+| Erwartungswert je Trade (Median) | **−0.375 R** |
+| Kombinationen mit positivem Erwartungswert | 16 von 144 |
+| davon mit zu kleiner Stichprobe | die Mehrheit — 86 von 144 sind unter der Schwelle |
 
-Für Gold sind die Daten inzwischen da (gemessener Spread statt geschätztem), die Auswertung
-steht noch aus. Bis dahin gilt: Der Bot ist zum Zusehen auf Demo gedacht, nicht zum Geldverdienen.
+Je Symbol, Median des Erwartungswerts: BTCUSD −0.165 R, ETHUSD −0.228 R, XAUUSD −0.242 R,
+SOLUSD −1.652 R. Die beste Einzelkombination (BTCUSD, +0.194 R über 91 Trades) ist die beste
+aus 144 Versuchen — genau das, was auch reiner Zufall liefern würde.
+
+Aufschlussreich war eine frühere Kostenrechnung: ohne Kosten liegt der Erwartungswert nahe null,
+also bei einem Münzwurf. Es sind Spread und Kommission, die daraus einen verlässlichen Verlust
+machen. Die beiden mitgelieferten Strategien haben **keinen Vorteil**, den sie bezahlen könnten.
+
+Der Bot ist also zum Zusehen auf Demo gedacht, nicht zum Geldverdienen. Was er zuverlässig
+zeigt, ist das Einhalten seiner Regeln — und dass er sich selbst abschaltet, wenn eine Strategie
+nicht liefert.

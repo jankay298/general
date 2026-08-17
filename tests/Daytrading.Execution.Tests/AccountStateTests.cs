@@ -117,4 +117,50 @@ public class AccountStateTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new AccountState(0m));
     }
+
+    [Fact]
+    public void Closing_a_winning_position_does_not_count_its_profit_twice()
+    {
+        // Der Gewinn steckt schon als unrealisierter Betrag in der Equity. Wird er beim
+        // Schliessen erneut aufgebucht, entsteht ein Hoch, das es nie gab - und weil das Hoch
+        // festgehalten wird, misst der Gesamt-Drawdown danach dauerhaft gegen eine Fantasiezahl.
+        var account = new AccountState(10_000m);
+        account.UpdateEquity(10_800m);          // Position liegt 800 im Plus
+
+        account.RealizeClosedPosition(800m);    // Position wird geschlossen
+        account.UpdateEquity(account.Balance);  // keine offenen Positionen mehr
+
+        Assert.Equal(10_800m, account.Balance);
+        Assert.Equal(10_800m, account.Equity);
+        Assert.Equal(10_800m, account.PeakEquity);
+        Assert.Equal(0m, account.TotalDrawdownPercent);
+    }
+
+    [Fact]
+    public void An_inflated_peak_would_shut_a_strategy_down_too_early()
+    {
+        // Dieselbe Abfolge, aber mit dem doppelt gebuchten Gewinn: Das Konto steht unveraendert
+        // bei 10.800, meldet aber einen Drawdown, als haette es 11.600 gesehen.
+        var account = new AccountState(10_000m);
+        account.UpdateEquity(10_800m);
+
+        account.ApplyRealizedPnL(800m);         // falsche Buchung: Equity 11.600
+        account.UpdateEquity(10_800m);          // korrekte Neubewertung
+
+        Assert.Equal(11_600m, account.PeakEquity);
+        Assert.True(account.TotalDrawdownPercent > 6m);
+    }
+
+    [Fact]
+    public void A_cost_that_is_not_in_the_equity_yet_reduces_balance_and_equity()
+    {
+        // Gegenprobe: Die Kommission beim Eroeffnen steckt in keiner offenen Position und
+        // gehoert deshalb auf beides.
+        var account = new AccountState(10_000m);
+
+        account.ApplyRealizedPnL(-25m);
+
+        Assert.Equal(9_975m, account.Balance);
+        Assert.Equal(9_975m, account.Equity);
+    }
 }

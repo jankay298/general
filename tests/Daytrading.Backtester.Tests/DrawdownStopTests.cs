@@ -106,6 +106,45 @@ public class DrawdownStopTests
     }
 
     [Fact]
+    public void The_drawdown_is_measured_from_the_starting_balance_not_from_the_first_bar()
+    {
+        // Der erste Punkt der Kurve entsteht erst nach der ersten Bar und kann schon im Minus
+        // liegen. Wird von dort aus gemessen, verschwindet der Rueckgang davor - und zwar immer
+        // zugunsten des Ergebnisses.
+        var curve = new List<EquityPoint>
+        {
+            new EquityPoint(Fixture.Monday.AddHours(10), 9_500m),   // schon 5 % unter Start
+            new EquityPoint(Fixture.Monday.AddHours(11), 9_000m),
+            new EquityPoint(Fixture.Monday.AddHours(12), 9_800m),
+        };
+
+        var entry = Fixture.Monday.AddHours(10);
+        var position = new Position("T1", "TEST", TradeDirection.Long, entry, 100m, 99m, null, 10m, "S");
+        var trade = new TradeRecord(
+            "S", position, entry.AddMinutes(45), 99m, ExitReason.StopLoss, -1_000m, 0m, 100m, 1m);
+
+        var metrics = PerformanceMetrics.Compute(new[] { trade }, curve, startingBalance: 10_000m);
+
+        Assert.Equal(10m, metrics.MaxDrawdownPercent, 2);
+        Assert.Equal(1_000m, metrics.MaxDrawdownAmount);
+    }
+
+    [Fact]
+    public void A_stopped_run_reports_a_drawdown_at_least_as_large_as_the_limit()
+    {
+        // Sonst widerspricht der Bericht sich selbst: "wegen 10 % Drawdown beendet" neben einer
+        // ausgewiesenen Spitze von 8.6 % laedt dazu ein, eine der beiden Zahlen zu glauben.
+        var result = Run(FallingMarket(120));
+
+        Assert.NotNull(result.StoppedAtUtc);
+        Assert.True(
+            result.Metrics.MaxDrawdownPercent >= RiskLimits.Default.MaxTotalDrawdownPercent,
+            $"Lauf wegen Gesamt-Drawdown beendet, ausgewiesen sind aber nur " +
+            $"{result.Metrics.MaxDrawdownPercent:0.00} % statt mindestens " +
+            $"{RiskLimits.Default.MaxTotalDrawdownPercent} %.");
+    }
+
+    [Fact]
     public void A_run_that_stays_within_the_limit_is_not_marked_as_stopped()
     {
         var result = Run(Fixture.FlatSession(Fixture.Monday, 32));

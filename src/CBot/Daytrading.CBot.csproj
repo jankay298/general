@@ -29,7 +29,7 @@
        "src.algo". Der Name steht im Dateisystem des Anwenders, nicht im Paket - cTrader liest
        den Robotnamen aus den Metadaten -, deshalb wird die fertige Datei unter einem
        sprechenden Namen nach /dist kopiert. Das ist die Datei zum Importieren. -->
-  <Target Name="CopyAlgoPackage" AfterTargets="Build">
+  <Target Name="CopyAlgoPackage" AfterTargets="_AlgoBuildAfterBuild">
     <PropertyGroup>
       <_DistDirectory>$(MSBuildThisFileDirectory)..\..\dist\</_DistDirectory>
     </PropertyGroup>

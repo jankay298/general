@@ -48,7 +48,8 @@ public sealed class ResultWriter
             "trades", "net_pnl", "return_percent", "max_drawdown_amount", "max_drawdown_percent",
             "profit_factor", "sharpe", "sortino", "hit_rate_percent", "expectancy_per_trade",
             "expectancy_r", "avg_holding_minutes", "longest_losing_streak", "trades_per_week",
-            "weeks_to_minimum_sample", "statistically_weak", "active_days", "stopped_at", "bars_processed", "rejections",
+            "weeks_to_minimum_sample", "statistically_weak", "active_days", "stopped_at", "stop_reason",
+            "bars_processed", "rejections",
         }));
 
         foreach (var result in results)
@@ -80,6 +81,7 @@ public sealed class ResultWriter
                 metrics.IsStatisticallyWeak ? "ja" : "nein",
                 Number(result.ActiveDays),
                 result.StoppedAtUtc.HasValue ? Date(result.StoppedAtUtc.Value) : string.Empty,
+                Escape(result.StopReason ?? string.Empty),
                 Number(result.BarsProcessed),
                 Escape(string.Join(" ", result.Rejections.OrderByDescending(pair => pair.Value)
                     .Select(pair => $"{pair.Key}={pair.Value}"))),

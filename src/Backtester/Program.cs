@@ -180,6 +180,30 @@ internal static class Commands
                 var other => throw new ArgumentException($"Unbekannte Quelle '{other}'."),
             };
 
+            if (provider is DukascopyDataProvider progressing)
+            {
+                // Diese Quelle braucht fuer mehrere Jahre Stunden. Eine Zeile je angefangenem
+                // Monat reicht, um zu sehen, dass es vorangeht - ohne das Log zuzumuellen.
+                var lastMonthReported = -1;
+                var started = DateTime.UtcNow;
+
+                progressing.Progress = (done, total, day) =>
+                {
+                    if (day.Month == lastMonthReported || total == 0)
+                    {
+                        return;
+                    }
+
+                    lastMonthReported = day.Month;
+                    var share = (double)done / total;
+                    var estimate = share > 0.01
+                        ? $", noch etwa {TimeSpan.FromSeconds((DateTime.UtcNow - started).TotalSeconds * (1 - share) / share):hh\\:mm}"
+                        : string.Empty;
+
+                    Console.WriteLine($"  {day:yyyy-MM} ... ({done}/{total} Tage{estimate})");
+                };
+            }
+
             Console.WriteLine($"Lade {symbol.Name} von {provider.Name} ({from:yyyy-MM-dd} bis {to:yyyy-MM-dd}) ...");
             var result = await pipeline.IngestAsync(symbol, provider, from, to);
 

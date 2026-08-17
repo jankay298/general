@@ -123,12 +123,31 @@ public sealed class AccountState
         UpdateEquity(equity);
     }
 
-    /// <summary>Bucht ein realisiertes Ergebnis auf den Kontostand und passt die Equity entsprechend an.</summary>
+    /// <summary>
+    /// Bucht ein Ergebnis auf den Kontostand, das noch nicht in der Equity steckt - etwa die
+    /// Kommission beim Eröffnen. Equity und Kontostand ändern sich um denselben Betrag.
+    /// </summary>
     public void ApplyRealizedPnL(decimal pnl)
     {
         Balance += pnl;
         UpdateEquity(Equity + pnl);
     }
+
+    /// <summary>
+    /// Bucht das Ergebnis einer <b>geschlossenen</b> Position auf den Kontostand.
+    /// </summary>
+    /// <remarks>
+    /// Hier ändert sich nur der Kontostand, nicht die Equity: Das Ergebnis war als
+    /// unrealisierter Betrag längst in der Equity enthalten, es wechselt beim Schließen
+    /// lediglich die Seite. Würde es zusätzlich auf die Equity gebucht, zählte jeder Gewinn
+    /// doppelt - und da <see cref="UpdateEquity"/> jedes Hoch festhält, bliebe ein
+    /// <see cref="PeakEquity"/> stehen, das es nie gab. Der daran gemessene Drawdown wäre zu
+    /// groß und die Strategie würde zu früh abgeschaltet.
+    ///
+    /// Der Aufrufer bewertet danach neu (<see cref="UpdateEquity"/> mit Kontostand plus den
+    /// verbleibenden offenen Positionen).
+    /// </remarks>
+    public void RealizeClosedPosition(decimal pnl) => Balance += pnl;
 
     /// <summary>Zählt einen an diesem Tag eröffneten Trade.</summary>
     public void RegisterTradeOpened() => TradesToday++;

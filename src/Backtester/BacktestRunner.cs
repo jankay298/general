@@ -222,8 +222,9 @@ public sealed class BacktestRunner
                 stoppedAt = barClose;
                 stopReason = string.Format(
                     CultureInfo.InvariantCulture,
-                    "Gesamt-Drawdown {0:0.00} % erreicht die Grenze von {1} %.",
-                    account.TotalDrawdownPercent, job.Limits.MaxTotalDrawdownPercent);
+                    "Gesamt-Drawdown {0:0.00} % erreicht die Grenze von {1} % (Hoch {2:0.00}, Equity {3:0.00}).",
+                    account.TotalDrawdownPercent, job.Limits.MaxTotalDrawdownPercent,
+                    account.PeakEquity, account.Equity);
                 warnings.Add(string.Format(
                     CultureInfo.InvariantCulture,
                     "{0:yyyy-MM-dd HH:mm}: Lauf beendet - {1}", barClose, stopReason));
@@ -250,7 +251,12 @@ public sealed class BacktestRunner
                     instruction.ExitReason ?? ExitReason.RiskLimit, FillKind.Market, thinAtClose, strategyKey);
             }
 
+            // Bewertung nach den Ausfuehrungen dieser Bar. Sie gehoert in die Kurve, weil die
+            // Risikoschicht mit genau diesem Wert weiterrechnet: Bliebe sie draussen, koennte
+            // das Konto ein Hoch erreichen, das im Bericht nie auftaucht - und der ausgewiesene
+            // Drawdown waere kleiner als der, wegen dem abgeschaltet wurde.
             account.UpdateEquity(account.Balance + Unrealized(openTrades, bar.Close, config));
+            equity.Add(new EquityPoint(barClose, account.Equity));
         }
 
         // Offene Positionen am Ende schließen - im Report als Sonderfall gekennzeichnet.
@@ -364,8 +370,11 @@ public sealed class BacktestRunner
                     * config.ValuePerPricePointPerUnit;
 
         // Die Einstiegskommission wurde beim Öffnen gebucht, hier folgt die zweite Seite.
+        // Das Bruttoergebnis steckt bereits als unrealisierter Betrag in der Equity und wandert
+        // hier nur auf den Kontostand; die Ausstiegskommission ist neu und trifft beides.
         var commission = cost.Commission(position.Quantity);
-        account.ApplyRealizedPnL(gross - commission);
+        account.RealizeClosedPosition(gross);
+        account.ApplyRealizedPnL(-commission);
 
         trades.Add(new TradeRecord(
             strategyKey,

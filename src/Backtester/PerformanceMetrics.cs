@@ -147,6 +147,18 @@ public sealed class PerformanceMetrics
         };
     }
 
+    /// <summary>
+    /// Größter Rückgang vom bis dahin höchsten Kontostand.
+    /// </summary>
+    /// <remarks>
+    /// Das Hoch beginnt beim <b>Startkapital</b>, nicht beim ersten Punkt der Kurve. Der erste
+    /// Punkt wird erst nach der ersten Bar geschrieben und kann bereits im Minus liegen; von ihm
+    /// aus zu messen versteckt genau den Teil des Rückgangs, der vor ihm entstanden ist.
+    ///
+    /// Auf echten Golddaten meldete ein Lauf so 8.56 % Drawdown, obwohl er von der
+    /// Risikoschicht bei 10 % abgeschaltet worden war - der Bericht widersprach sich selbst,
+    /// und zwar in die angenehme Richtung.
+    /// </remarks>
     private static (decimal Amount, decimal Percent) MaxDrawdown(IReadOnlyList<EquityPoint> curve, decimal startingBalance)
     {
         if (curve == null || curve.Count == 0)
@@ -154,7 +166,7 @@ public sealed class PerformanceMetrics
             return (0m, 0m);
         }
 
-        var peak = curve[0].Equity;
+        var peak = Math.Max(startingBalance, curve[0].Equity);
         var worstAmount = 0m;
         var worstPercent = 0m;
 

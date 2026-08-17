@@ -15,7 +15,7 @@
 
   <!-- Siehe Daytrading.CBot.csproj: das SDK benennt das Paket nach dem Ordner ueber dem
        Projekt. Beide Projekte liegen unter /src und wuerden dieselbe Datei erzeugen. -->
-  <Target Name="CopyAlgoPackage" AfterTargets="Build">
+  <Target Name="CopyAlgoPackage" AfterTargets="_AlgoBuildAfterBuild">
     <PropertyGroup>
       <_DistDirectory>$(MSBuildThisFileDirectory)..\..\dist\</_DistDirectory>
     </PropertyGroup>

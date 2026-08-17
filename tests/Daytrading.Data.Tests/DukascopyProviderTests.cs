@@ -274,6 +274,26 @@ public class DukascopyProviderTests
     }
 
     [Fact]
+    public async Task Reports_progress_for_every_day_of_the_range()
+    {
+        // Ein Abruf über mehrere Jahre läuft hier stundenlang. Ohne Rückmeldung ist von außen
+        // nicht zu unterscheiden, ob er arbeitet oder hängt.
+        var seen = new List<(int Done, int Total, DateTime Day)>();
+        var provider = new DukascopyDataProvider(new FakeDownloader(), throttleMilliseconds: 0)
+        {
+            Progress = (done, total, day) => seen.Add((done, total, day)),
+        };
+
+        await provider.GetBarsAsync(Request(days: 3));
+
+        Assert.Equal(3, seen.Count);
+        Assert.All(seen, entry => Assert.Equal(3, entry.Total));
+        Assert.Equal(new[] { 0, 1, 2 }, seen.Select(entry => entry.Done));
+        Assert.Equal(Day, seen[0].Day);
+        Assert.Equal(Day.AddDays(2), seen[2].Day);
+    }
+
+    [Fact]
     public void Rejects_a_non_positive_price_scale()
     {
         Assert.Throws<ArgumentOutOfRangeException>(

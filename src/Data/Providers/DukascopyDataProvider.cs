@@ -83,6 +83,15 @@ public sealed class DukascopyDataProvider : IDataProvider
 
     public Timeframe NativeTimeframe => Timeframe.M1;
 
+    /// <summary>
+    /// Wird nach jedem Tag gerufen: verarbeitete Tage, Gesamtzahl, gerade geladener Tag.
+    /// </summary>
+    /// <remarks>
+    /// Ein Abruf über mehrere Jahre dauert bei dieser Quelle Stunden. Ohne Rückmeldung ist von
+    /// außen nicht zu unterscheiden, ob er arbeitet oder hängt.
+    /// </remarks>
+    public Action<int, int, DateTime>? Progress { get; set; }
+
     /// <summary>Aus Bid- und Ask-Kerzen gemessener Spread der letzten Abfrage.</summary>
     public SpreadStatistics? LastSpreadStatistics { get; private set; }
 
@@ -161,9 +170,13 @@ public sealed class DukascopyDataProvider : IDataProvider
         var bars = new List<Candle>();
         var spreads = new List<decimal>();
 
+        var totalDays = Math.Max(0, (int)Math.Ceiling((request.ToUtc - request.FromUtc.Date).TotalDays));
+        var processedDays = 0;
+
         for (var day = request.FromUtc.Date; day < request.ToUtc; day = day.AddDays(1))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            Progress?.Invoke(processedDays++, totalDays, day);
 
             try
             {
