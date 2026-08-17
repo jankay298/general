@@ -28,6 +28,9 @@ public static class StrategyCatalog
             ["RsiReversal"] = () => new RsiReversalStrategy(),
             ["VolatilitySqueeze"] = () => new VolatilitySqueezeStrategy(),
 
+            // Keine Strategie, sondern der Vergleichsmassstab: Einstieg per Muenzwurf.
+            ["RandomEntry"] = () => new RandomEntryStrategy(),
+
             // Die gespiegelten Fassungen. Sie beantworten die Frage, ob ein Verlust aus der
             // Richtung kommt oder aus den Kosten - siehe InvertedStrategy.
             ["InvertedOpeningRangeBreakout"] = () => new InvertedStrategy(new OpeningRangeBreakoutStrategy()),

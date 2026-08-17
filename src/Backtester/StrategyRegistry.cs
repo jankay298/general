@@ -90,6 +90,17 @@ public static class StrategyRegistry
                 ("StopAtrMultiple", new[] { "1", "1.5", "2" }),
                 ("TakeProfitR", new[] { "1.5", "2", "3" }))),
 
+        // Der Massstab: Muenzwurf-Einstiege ueber dieselben Chance-Risiko-Verhaeltnisse.
+        // Er beantwortet zwei Fragen auf einmal - was kostet das Handeln an sich, und
+        // bringt ein festes Verhaeltnis von sich aus etwas.
+        new StrategyRegistration(
+            "RandomEntry",
+            () => StrategyCatalog.Create("RandomEntry"),
+            Grid(
+                ("TakeProfitR", new[] { "1", "1.5", "2", "3" }),
+                ("StopAtrMultiple", new[] { "1", "1.5", "2" }),
+                ("EntryProbability", new[] { "0.02", "0.05" }))),
+
         // Dieselben Strategien mit gedrehter Richtung, auf demselben Parameterraum. Sie
         // beantworten eine einzige Frage: Kommt der Verlust aus der Richtung oder aus den
         // Kosten? Sind beide Fassungen negativ, sind es die Kosten.
