@@ -54,6 +54,23 @@ public sealed class BacktestResult
     public IReadOnlyDictionary<RiskRejectionReason, int> Rejections { get; init; } =
         new Dictionary<RiskRejectionReason, int>();
 
+    /// <summary>
+    /// Zeitpunkt, zu dem der Lauf vorzeitig endete, weil eine Risikogrenze die Strategie
+    /// gestoppt hat. Null, wenn er bis zum Ende der Daten lief.
+    /// </summary>
+    /// <remarks>
+    /// Der Gesamt-Drawdown ist kein Tageslimit: Ist er einmal erreicht, verlangen die Regeln,
+    /// die Strategie zu stoppen und zu prüfen. Der Lauf danach weiterzurechnen würde Jahre ohne
+    /// Trades in die Kennzahlen mischen - Sharpe, Drawdown und Trades pro Woche bezögen sich auf
+    /// einen Zeitraum, in dem die Strategie längst abgeschaltet war.
+    /// </remarks>
+    public DateTime? StoppedAtUtc { get; init; }
+
+    public string? StopReason { get; init; }
+
+    /// <summary>Tage, an denen der Lauf tatsächlich handeln durfte.</summary>
+    public int ActiveDays { get; init; }
+
     public int BarsProcessed { get; init; }
 
     /// <summary>Bars, die in keiner Session lagen - vorbörslich, nachbörslich, Feiertag.</summary>

@@ -48,7 +48,7 @@ public sealed class ResultWriter
             "trades", "net_pnl", "return_percent", "max_drawdown_amount", "max_drawdown_percent",
             "profit_factor", "sharpe", "sortino", "hit_rate_percent", "expectancy_per_trade",
             "expectancy_r", "avg_holding_minutes", "longest_losing_streak", "trades_per_week",
-            "weeks_to_minimum_sample", "statistically_weak", "bars_processed", "rejections",
+            "weeks_to_minimum_sample", "statistically_weak", "active_days", "stopped_at", "bars_processed", "rejections",
         }));
 
         foreach (var result in results)
@@ -78,6 +78,8 @@ public sealed class ResultWriter
                 Number(metrics.TradesPerWeek),
                 metrics.WeeksToMinimumSample.HasValue ? Number(metrics.WeeksToMinimumSample.Value) : string.Empty,
                 metrics.IsStatisticallyWeak ? "ja" : "nein",
+                Number(result.ActiveDays),
+                result.StoppedAtUtc.HasValue ? Date(result.StoppedAtUtc.Value) : string.Empty,
                 Number(result.BarsProcessed),
                 Escape(string.Join(" ", result.Rejections.OrderByDescending(pair => pair.Value)
                     .Select(pair => $"{pair.Key}={pair.Value}"))),
@@ -248,6 +250,21 @@ public sealed class ResultWriter
             CultureInfo.InvariantCulture,
             "{0} von {1} Läufen haben zu wenige Trades für eine belastbare Aussage (Schwelle: {2}).",
             weak, matrix.Results.Count, options.MinimumSampleTrades));
+
+        var stopped = matrix.Results.Where(result => result.StoppedAtUtc.HasValue).ToList();
+        if (stopped.Count > 0)
+        {
+            text.AppendLine();
+            text.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "**{0} von {1} Läufen wurden vorzeitig beendet**, weil der Gesamt-Drawdown erreicht war. " +
+                "Ihre Kennzahlen beziehen sich auf die Zeit bis dahin - im Median {2:0} Tage. Das ist keine " +
+                "Schwäche des Backtests, sondern das Ergebnis: Diese Kombinationen hätten nach den Regeln " +
+                "abgeschaltet werden müssen.",
+                stopped.Count,
+                matrix.Results.Count,
+                stopped.Select(result => (decimal)result.ActiveDays).OrderBy(days => days).ElementAt(stopped.Count / 2)));
+        }
 
         var slow = matrix.Results
             .Where(result => result.Metrics.WeeksToMinimumSample is > 52m)

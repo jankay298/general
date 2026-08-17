@@ -122,6 +122,10 @@ public sealed class BacktestRunner
         var positionCounter = 0;
         var barsProcessed = 0;
         var barsOutside = 0;
+        DateTime? stoppedAt = null;
+        string? stopReason = null;
+        DateTime? firstBarUtc = null;
+        var lastBarUtc = DateTime.MinValue;
 
         for (var index = 0; index < job.Bars.Count; index++)
         {
@@ -135,6 +139,8 @@ public sealed class BacktestRunner
             }
 
             barsProcessed++;
+            firstBarUtc ??= bar.OpenTimeUtc;
+            lastBarUtc = barClose;
             history.Append(bar);
 
             var thinAtOpen = CostModel.IsThinLiquidity(session, bar.OpenTimeUtc);
@@ -209,6 +215,21 @@ public sealed class BacktestRunner
                 rejections[decision.Reason] = count + 1;
             }
 
+            // Der Gesamt-Drawdown ist erreicht: Nach den Regeln wird die Strategie gestoppt und
+            // geprueft. Also endet auch der Lauf hier, statt jahrelang ohne Trades weiterzuzaehlen.
+            if (account.TotalDrawdownPercent >= job.Limits.MaxTotalDrawdownPercent)
+            {
+                stoppedAt = barClose;
+                stopReason = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "Gesamt-Drawdown {0:0.00} % erreicht die Grenze von {1} %.",
+                    account.TotalDrawdownPercent, job.Limits.MaxTotalDrawdownPercent);
+                warnings.Add(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0:yyyy-MM-dd HH:mm}: Lauf beendet - {1}", barClose, stopReason));
+                break;
+            }
+
             // E) Anweisungen umsetzen.
             foreach (var instruction in instructions)
             {
@@ -232,16 +253,18 @@ public sealed class BacktestRunner
             account.UpdateEquity(account.Balance + Unrealized(openTrades, bar.Close, config));
         }
 
-        // Offene Positionen am Datenende schließen - im Report als Sonderfall gekennzeichnet.
+        // Offene Positionen am Ende schließen - im Report als Sonderfall gekennzeichnet.
+        // Wurde der Lauf durch eine Risikogrenze beendet, ist das der Grund, nicht das Datenende.
         if (openTrades.Count > 0 && history.Count > 0)
         {
             var last = history.Last();
             var lastClose = last.OpenTimeUtc + timeframe.Duration;
+            var reason = stoppedAt.HasValue ? ExitReason.RiskLimit : ExitReason.EndOfData;
             for (var i = openTrades.Count - 1; i >= 0; i--)
             {
                 CloseTrade(
                     trades, openTrades, positions, account, cost, config, i, last.Close, lastClose,
-                    ExitReason.EndOfData, FillKind.Market, false, strategyKey);
+                    reason, FillKind.Market, false, strategyKey);
             }
 
             account.UpdateEquity(account.Balance);
@@ -270,6 +293,9 @@ public sealed class BacktestRunner
             EquityCurve = equity,
             Metrics = PerformanceMetrics.Compute(trades, equity, job.Options.StartingBalance, job.Options.MinimumSampleTrades),
             Rejections = rejections,
+            StoppedAtUtc = stoppedAt,
+            StopReason = stopReason,
+            ActiveDays = firstBarUtc.HasValue ? (int)Math.Ceiling((lastBarUtc - firstBarUtc.Value).TotalDays) : 0,
             BarsProcessed = barsProcessed,
             BarsOutsideSession = barsOutside,
             Warnings = warnings,
