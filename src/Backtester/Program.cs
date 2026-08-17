@@ -131,6 +131,10 @@ internal sealed class CommandLine
           --balance <zahl>    Startkapital             (Vorgabe: 10000)
           --spread-factor <f> Spread-Annahmen skalieren, z.B. 0.1 oder 3 (Vorgabe: 1)
           --max-cost-share <p> Einstiege ablehnen, wenn Kosten mehr als p % des Risikos sind (Vorgabe: 100 = aus)
+          --breakeven-r <r>   Stop auf Einstieg ab r R Vorsprung (Vorgabe: 0 = aus)
+          --trail-r <r>       Stop r R hinter dem Bestkurs nachziehen (Vorgabe: 0 = aus)
+          --trail-start-r <r> Trailing beginnt ab r R Vorsprung (Vorgabe: 1)
+          --limit-entries     Einstiege als Limit auf dem Signalkurs statt als Marktorder
           --verbose           Vollstaendige Fehlerausgabe
 
         Nur fuer ingest:
@@ -313,6 +317,11 @@ internal static class Commands
         // Kostenfilter: Einstiege ablehnen, deren Stop zu eng fuer den Spread ist. 100 heisst
         // aus. Der Wert ist der Anteil des Risikos, den Spread und Kommission verbrauchen duerfen.
         limits.MaxCostShareOfRiskPercent = arguments.GetDecimal("max-cost-share", 100m);
+
+        // Positionsfuehrung: wirkt auf alle Strategien gleich, deshalb hier und nicht je Strategie.
+        limits.BreakevenAfterR = arguments.GetDecimal("breakeven-r", 0m);
+        limits.TrailStopDistanceR = arguments.GetDecimal("trail-r", 0m);
+        limits.TrailStartsAfterR = arguments.GetDecimal("trail-start-r", 1m);
         limits.Validate();
 
         // Kostenannahmen skalieren: Die Spread-Angaben der Konfiguration sind Annahmen, solange
@@ -342,6 +351,7 @@ internal static class Commands
             SlippageTicks = arguments.GetDecimal("slippage", 1m),
             StopSlippageTicks = arguments.GetDecimal("stop-slippage", 3m),
             RandomSeed = arguments.GetInt("seed", 20240301),
+            UseLimitEntries = arguments.Has("limit-entries"),
             MinimumSampleTrades = arguments.GetInt("min-trades", 30),
         };
 

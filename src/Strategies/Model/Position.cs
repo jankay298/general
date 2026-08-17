@@ -79,6 +79,16 @@ public sealed class Position
     /// <summary>Preisabstand zwischen Einstieg und Stop.</summary>
     public decimal RiskDistance => Math.Abs(EntryPrice - StopLoss);
 
+    /// <summary>Dieselbe Position mit nachgezogenem Stop.</summary>
+    /// <remarks>
+    /// Neues Objekt statt setzbarer Eigenschaft: Eine Position, die sich von außen still
+    /// verändern lässt, macht jede Auswertung angreifbar - man weiß hinterher nicht mehr, mit
+    /// welchem Stop sie eigentlich lief. Der ursprüngliche Stop bleibt so im Trade-Log erhalten,
+    /// und das geplante Risiko bleibt die Bezugsgröße für das R-Vielfache.
+    /// </remarks>
+    public Position WithStopLoss(decimal stopLoss) =>
+        new Position(Id, Symbol, Direction, EntryTimeUtc, EntryPrice, stopLoss, TakeProfit, Quantity, StrategyTag);
+
     /// <summary>Haltedauer bis zum angegebenen Zeitpunkt.</summary>
     public TimeSpan HoldingTime(DateTime utcNow) => utcNow - EntryTimeUtc;
 

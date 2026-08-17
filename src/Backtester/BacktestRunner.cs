@@ -78,6 +78,15 @@ public sealed class BacktestRunner
         public decimal RiskPercent { get; }
 
         public int EntryBarIndex { get; }
+
+        /// <summary>Abstand Einstieg-zu-Stop beim Eroeffnen. Bezugsgroesse fuer R, wandert nie mit.</summary>
+        public decimal RiskDistanceAtEntry => Position.RiskDistance;
+
+        /// <summary>Die Position mit dem aktuell gueltigen Stop - Nachziehen ersetzt sie.</summary>
+        public Position Current { get; set; } = null!;
+
+        /// <summary>Bestkurs seit Einstieg: hoechstes Hoch bei Long, tiefstes Tief bei Short.</summary>
+        public decimal BestPrice { get; set; }
     }
 
     public BacktestResult Run(BacktestJob job)
@@ -146,12 +155,39 @@ public sealed class BacktestRunner
             var thinAtOpen = CostModel.IsThinLiquidity(session, bar.OpenTimeUtc);
             var thinAtClose = CostModel.IsThinLiquidity(session, barClose);
 
-            // A) Aufträge der Vorbar auf der Open ausführen.
+            // A) Aufträge der Vorbar ausführen.
             foreach (var instruction in pendingEntries)
             {
                 var direction = instruction.Direction!.Value;
-                var entryPrice = cost.EntryPrice(direction, bar.Open, thinAtOpen);
                 var stop = instruction.StopLoss!.Value;
+                decimal entryPrice;
+
+                if (job.Options.UseLimitEntries)
+                {
+                    // Limit auf dem Signalkurs: Wir warten, bis der Markt zu uns zurueckkommt,
+                    // statt ihm hinterherzulaufen. Das spart den halben Spread - und kostet die
+                    // Trades, bei denen der Kurs ohne Ruecksetzer davonlaeuft. Beides gehoert
+                    // zusammen; nur den Preisvorteil zu buchen waere Schoenrechnerei.
+                    var limit = instruction.ReferencePrice;
+                    var reached = direction == TradeDirection.Long
+                        ? bar.Low <= limit
+                        : bar.High >= limit;
+
+                    if (!reached)
+                    {
+                        continue;
+                    }
+
+                    // Als passive Seite zahlen wir den halben Spread nicht, wohl aber die
+                    // Kurslücke: Eroeffnet die Bar schon jenseits des Limits, gilt die Open.
+                    entryPrice = direction == TradeDirection.Long
+                        ? Math.Min(limit, bar.Open)
+                        : Math.Max(limit, bar.Open);
+                }
+                else
+                {
+                    entryPrice = cost.EntryPrice(direction, bar.Open, thinAtOpen);
+                }
 
                 if ((entryPrice - stop) * direction.Sign() <= 0m)
                 {
@@ -178,17 +214,38 @@ public sealed class BacktestRunner
                 // Risiko aus dem tatsächlichen Fill, nicht aus dem geplanten Preis: nur so ist
                 // das R-Vielfache im Trade-Log ehrlich.
                 var risk = Math.Abs(entryPrice - stop) * instruction.Quantity * config.ValuePerPricePointPerUnit;
-                openTrades.Add(new OpenTrade(position, risk, instruction.RiskPercent, index));
+                openTrades.Add(new OpenTrade(position, risk, instruction.RiskPercent, index)
+                {
+                    Current = position,
+                    BestPrice = entryPrice,
+                });
                 positions.Add(position);
                 account.ApplyRealizedPnL(-cost.Commission(instruction.Quantity));
             }
 
             pendingEntries.Clear();
 
-            // B) Stop und Ziel innerhalb der Bar.
+            // B) Stop und Ziel innerhalb der Bar. Vorher wird der Stop nachgezogen - aber nur
+            // anhand des Bestkurses der BISHERIGEN Bars. Den Verlauf innerhalb der laufenden Bar
+            // zu verwenden waere Look-ahead: Man wuesste, wie weit es noch laeuft.
             for (var i = openTrades.Count - 1; i >= 0; i--)
             {
                 var trade = openTrades[i];
+
+                if (trade.EntryBarIndex < index)
+                {
+                    var moved = StopManagement.Adjust(trade.Current, trade.RiskDistanceAtEntry, trade.BestPrice, job.Limits);
+                    if (moved.HasValue)
+                    {
+                        trade.Current = trade.Current.WithStopLoss(moved.Value);
+                        var slot = positions.FindIndex(p => p.Id == trade.Current.Id);
+                        if (slot >= 0)
+                        {
+                            positions[slot] = trade.Current;
+                        }
+                    }
+                }
+
                 var exit = DetectIntrabarExit(trade, bar, index);
                 if (exit == null)
                 {
@@ -198,6 +255,13 @@ public sealed class BacktestRunner
                 CloseTrade(
                     trades, openTrades, positions, account, cost, config, i, exit.Value.Price, barClose,
                     exit.Value.Reason, exit.Value.Kind, thinAtClose, strategyKey);
+            }
+
+            foreach (var open in openTrades)
+            {
+                open.BestPrice = open.Current.Direction == TradeDirection.Long
+                    ? Math.Max(open.BestPrice, bar.High)
+                    : Math.Min(open.BestPrice, bar.Low);
             }
 
             // C) Bewertung zum Bar-Close.
@@ -310,7 +374,7 @@ public sealed class BacktestRunner
 
     private static (decimal Price, ExitReason Reason, FillKind Kind)? DetectIntrabarExit(OpenTrade trade, Candle bar, int index)
     {
-        var position = trade.Position;
+        var position = trade.Current ?? trade.Position;
         var openedThisBar = trade.EntryBarIndex == index;
         var isLong = position.Direction == TradeDirection.Long;
 
@@ -361,7 +425,7 @@ public sealed class BacktestRunner
         string strategyKey)
     {
         var trade = openTrades[index];
-        var position = trade.Position;
+        var position = trade.Current ?? trade.Position;
         var exitPrice = cost.ExitPrice(position.Direction, exitMidPrice, thinLiquidity, kind);
 
         var gross = (exitPrice - position.EntryPrice)
@@ -396,7 +460,7 @@ public sealed class BacktestRunner
         var total = 0m;
         foreach (var trade in openTrades)
         {
-            var position = trade.Position;
+            var position = trade.Current ?? trade.Position;
             total += (price - position.EntryPrice)
                      * position.Direction.Sign()
                      * position.Quantity

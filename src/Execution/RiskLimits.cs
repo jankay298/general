@@ -65,6 +65,15 @@ public sealed class RiskLimits
     /// </remarks>
     public decimal MaxCostShareOfRiskPercent { get; set; } = 100m;
 
+    /// <summary>Ab diesem Vorsprung in R rückt der Stop auf den Einstieg. 0 schaltet es ab.</summary>
+    public decimal BreakevenAfterR { get; set; }
+
+    /// <summary>Abstand des nachgezogenen Stops zum Bestkurs, in R. 0 schaltet das Trailing ab.</summary>
+    public decimal TrailStopDistanceR { get; set; }
+
+    /// <summary>Ab diesem Vorsprung in R beginnt das Trailing.</summary>
+    public decimal TrailStartsAfterR { get; set; } = 1m;
+
     /// <summary>
     /// Reines Sicherheitsnetz gegen viele Kleinstpositionen. Die bindende Grenze für parallele
     /// Trades ist <see cref="MaxOpenRiskPercent"/>, nicht diese Zahl.

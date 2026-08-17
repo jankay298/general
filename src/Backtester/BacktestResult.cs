@@ -22,6 +22,16 @@ public sealed class BacktestOptions
     /// <summary>Mindestanzahl Trades, ab der ein Ergebnis als statistisch belastbar gilt.</summary>
     public int MinimumSampleTrades { get; set; } = 30;
 
+    /// <summary>
+    /// Einstiege als Limit auf dem Signalkurs statt als Marktorder auf der Folge-Open.
+    /// </summary>
+    /// <remarks>
+    /// Zwei gegenlaeufige Wirkungen, die nur zusammen ehrlich sind: Der halbe Spread entfaellt,
+    /// weil wir die passive Seite sind - und alle Trades entfallen, bei denen der Kurs ohne
+    /// Ruecksetzer davonlaeuft. Ob der Tausch sich lohnt, haengt daran, wie oft das passiert.
+    /// </remarks>
+    public bool UseLimitEntries { get; set; }
+
     public BacktestOptions Clone() => (BacktestOptions)MemberwiseClone();
 }
 
