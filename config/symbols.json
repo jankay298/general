@@ -6,7 +6,15 @@
     "timeZone": "UTC",
     "sessionStart": "00:00",
     "sessionEnd": "24:00",
-    "tradingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    "tradingDays": [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday"
+    ],
     "holidayCalendar": "none",
     "workingTimeframe": "M5",
     "tickSize": 0.01,
@@ -25,7 +33,15 @@
     "timeZone": "UTC",
     "sessionStart": "00:00",
     "sessionEnd": "24:00",
-    "tradingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    "tradingDays": [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday"
+    ],
     "holidayCalendar": "none",
     "workingTimeframe": "M5",
     "tickSize": 0.01,
@@ -44,7 +60,15 @@
     "timeZone": "UTC",
     "sessionStart": "00:00",
     "sessionEnd": "24:00",
-    "tradingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    "tradingDays": [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday"
+    ],
     "holidayCalendar": "none",
     "workingTimeframe": "M5",
     "tickSize": 0.001,
@@ -71,7 +95,8 @@
     "valuePerPricePointPerUnit": 1,
     "typicalSpread": 0.3,
     "commissionPerUnitPerSide": 0,
-    "thinLiquiditySpreadFactor": 2.0
+    "thinLiquiditySpreadFactor": 2.0,
+    "sourceSymbol": "XAU_USD"
   },
   {
     "name": "US500",
@@ -88,7 +113,8 @@
     "valuePerPricePointPerUnit": 1,
     "typicalSpread": 0.5,
     "commissionPerUnitPerSide": 0,
-    "thinLiquiditySpreadFactor": 1.5
+    "thinLiquiditySpreadFactor": 1.5,
+    "sourceSymbol": "SPX500_USD"
   },
   {
     "name": "AAPL",
@@ -105,6 +131,42 @@
     "valuePerPricePointPerUnit": 1,
     "typicalSpread": 0.02,
     "commissionPerUnitPerSide": 0.005,
+    "thinLiquiditySpreadFactor": 1.5
+  },
+  {
+    "name": "XAGUSD",
+    "sourceSymbol": "XAG_USD",
+    "assetClass": "Commodity",
+    "timeZone": "UTC",
+    "sessionStart": "07:00",
+    "sessionEnd": "21:00",
+    "holidayCalendar": "none",
+    "workingTimeframe": "M5",
+    "tickSize": 0.001,
+    "minQuantity": 1,
+    "quantityStep": 1,
+    "maxQuantity": 10000,
+    "valuePerPricePointPerUnit": 1,
+    "typicalSpread": 0.02,
+    "commissionPerUnitPerSide": 0,
+    "thinLiquiditySpreadFactor": 2.0
+  },
+  {
+    "name": "NAS100",
+    "sourceSymbol": "NAS100_USD",
+    "assetClass": "Index",
+    "timeZone": "America/New_York",
+    "sessionStart": "09:30",
+    "sessionEnd": "16:00",
+    "holidayCalendar": "us-equity",
+    "workingTimeframe": "M5",
+    "tickSize": 0.1,
+    "minQuantity": 0.1,
+    "quantityStep": 0.1,
+    "maxQuantity": 1000,
+    "valuePerPricePointPerUnit": 1,
+    "typicalSpread": 1.5,
+    "commissionPerUnitPerSide": 0,
     "thinLiquiditySpreadFactor": 1.5
   }
 ]
