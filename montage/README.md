@@ -33,6 +33,25 @@ the best part of an hour — so trying out three different tracks is cheap:
     --output lissabon-v2.mp4
 ```
 
+## Getting the archive in
+
+A phone album is usually far too big to attach to a message, so it travels as a
+share link instead:
+
+```bash
+./montage/fetch-archive.sh "https://drive.google.com/file/d/..." lissabon.zip
+./montage/make-montage.py --input lissabon.zip --output lissabon.mp4 --max-minutes 6
+```
+
+`fetch-archive.sh` rewrites Dropbox share links to direct downloads, uses gdown
+for Google Drive (which serves an HTML interstitial for large files instead of
+the file), resumes a transfer that was cut off rather than restarting it, and
+checks there is room for the archive plus its unpacked contents before starting.
+A link that is not shared publicly fails in a second with the reason, rather
+than after five rounds of backoff.
+
+The link must be set to "anyone with the link can view".
+
 ## Requirements
 
 ```bash
