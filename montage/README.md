@@ -24,6 +24,15 @@ A six-minute cut with music, from the same archive:
 `--max-minutes` keeps every n-th clip rather than the first n, so a shortened
 film still runs from the first morning to the last evening.
 
+Music can also go on afterwards. Pointing `--input` at a finished film swaps the
+soundtrack in without re-rendering a single clip, which takes seconds rather than
+the best part of an hour — so trying out three different tracks is cheap:
+
+```bash
+./montage/make-montage.py --input lissabon.mp4 --music other-track.mp3 \
+    --output lissabon-v2.mp4
+```
+
 ## Requirements
 
 ```bash

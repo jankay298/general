@@ -611,7 +611,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         description="Build a chronological montage video from a zip or folder of photos and videos.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--input", required=True, type=Path, help="zip archive or folder of media")
+    p.add_argument("--input", required=True, type=Path,
+                   help="zip archive or folder of media, or a finished video to add music to")
     p.add_argument("--output", required=True, type=Path, help="output video file (.mp4)")
     p.add_argument("--photo-duration", type=float, default=2.5, help="seconds each photo is on screen")
     p.add_argument("--video-max", type=float, default=6.0, help="seconds to keep from each video clip")
@@ -673,6 +674,19 @@ def main(argv: list[str]) -> int:
     opts.output.parent.mkdir(parents=True, exist_ok=True)
 
     try:
+        # Handed a finished film rather than an archive: just lay the music over
+        # it. Swapping soundtracks, or adding one later, should cost a minute
+        # rather than a re-render of every clip.
+        if opts.input.is_file() and opts.input.suffix.lower() in VIDEO_SUFFIXES:
+            if not opts.music:
+                sys.exit("--input is a video, so --music is required to have anything to do")
+            if not opts.music.exists():
+                sys.exit(f"Music file not found: {opts.music}")
+            log(f"Laying {opts.music.name} over {opts.input.name} without re-rendering")
+            add_music(opts.input, opts.music, opts.output, opts)
+            log(f"Done: {opts.output}")
+            return 0
+
         media_root = unpack(opts.input, workdir)
         photos, videos = collect(media_root)
         log(f"Found {len(photos)} photos and {len(videos)} videos")
