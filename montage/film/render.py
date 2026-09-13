@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, "/tmp/claude-0/-home-user-general/06cb9692-f1ed-541f-8ed7-e9c306cec4f3/scratchpad/edit")
-from look import frame_filter, GRADE, W, H, FONT_DISPLAY, FONT_TEXT
+from look import frame_filter, fit_whole, GRADE, W, H, FONT_DISPLAY, FONT_TEXT
 import music
 
 S = Path("/tmp/claude-0/-home-user-general/06cb9692-f1ed-541f-8ed7-e9c306cec4f3/scratchpad")
@@ -76,7 +76,11 @@ def render_shot(args):
         zoom = 1.06
     else:
         move, zoom = None, 1.0
-    vf = frame_filter(w, h, s["cx"], s["cy"], zoom=zoom, dur=dur, fps=FPS, move=move)
+    if s.get("whole"):
+        # Wide shot: show the entire frame rather than cropping two thirds away.
+        vf = fit_whole(w, h, dur=dur, fps=FPS, zoom=1.035 if s["kind"]=="photo" else 1.0)
+    else:
+        vf = frame_filter(w, h, s["cx"], s["cy"], zoom=zoom, dur=dur, fps=FPS, move=move)
     vf += "," + GRADE + f",fps={FPS},setsar=1,format=yuv420p"
     if s.get("fade_in"):  vf += f",fade=t=in:st=0:d={s['fade_in']}"
     if s.get("fade_out"): vf += f",fade=t=out:st={max(0,dur-s['fade_out']):.2f}:d={s['fade_out']}"
@@ -146,12 +150,21 @@ if __name__ == "__main__":
     # fade the very last shot out, and dip in from black at the start
     shots[0]["fade_in"] = 0.8
     shots[-1]["fade_out"] = 2.2
-    # give each beat's first shot a tiny fade for breathing room at chapter turns
+    # Cuts inside a scene stay hard -- that is what makes an edit feel cut rather
+    # than stepped through. Scene changes get a short dip to black, which reads as
+    # a transition without the cost and mush of crossfading every shot.
     prev_beat = None
-    for s in shots:
-        if s["beat"] != prev_beat and s["beat"] in ("d3_start","lastday","morning"):
-            s["fade_in"] = 0.5
-        prev_beat = s["beat"]
+    for i, sh in enumerate(shots):
+        if prev_beat is not None and sh["beat"] != prev_beat:
+            sh["fade_in"] = 0.30
+            if i: shots[i-1]["fade_out"] = max(shots[i-1].get("fade_out",0), 0.30)
+        prev_beat = sh["beat"]
+    for key in ("d3_start","lastday"):          # day changes breathe a little longer
+        for i, sh in enumerate(shots):
+            if sh["beat"] == key:
+                sh["fade_in"] = 0.6
+                if i: shots[i-1]["fade_out"] = 0.6
+                break
 
     print(f"{len(shots)} Segmente", flush=True)
     jobs = int(os.environ.get("JOBS","4"))

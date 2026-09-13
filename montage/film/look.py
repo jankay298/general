@@ -12,16 +12,23 @@ FONT_TEXT = "/mnt/skills/examples/canvas-design/canvas-fonts/InstrumentSans-Regu
 # The glow is built at quarter resolution: a 25px blur on a 1080x1920 frame costs
 # more than the whole rest of the chain, and after blurring nobody can tell.
 HALATION = (
-    "split=2[hbase][hglow];"
-    # isolate the brightest areas only
-    "[hglow]scale=iw/4:ih/4,"
-    "curves=r='0/0 0.62/0.03 0.80/0.45 1/1':"
-    "g='0/0 0.66/0.02 0.86/0.34 1/0.9':"
-    "b='0/0 0.72/0.01 0.92/0.2 1/0.72',"
-    "gblur=sigma=7,scale=iw*4:ih*4,"
-    # halation is red-dominant: that is the physical signature
-    "colorchannelmixer=rr=1.0:gg=0.55:bb=0.38[hg];"
-    "[hbase][hg]blend=all_mode=screen:all_opacity=0.30"
+    # Blend in RGB, not YUV. ffmpeg's blend works on whatever planes it is given,
+    # and "screen" applied to the U/V chroma planes shifts colour instead of only
+    # lifting brightness -- a neutral test blend that way turned a neutral frame
+    # 26 points magenta. Converting to gbrp first makes screen mean what it says.
+    f"format=gbrp,split=2[hbase][hglow];"
+    # Isolate only genuinely bright areas: a lower threshold pulls most of a
+    # daylit frame into the glow and tints the whole picture rather than blooming
+    # its highlights. Built at quarter size because a wide blur is expensive and
+    # nobody can tell afterwards.
+    f"[hglow]scale={W//4}:{H//4},"
+    "curves=r='0/0 0.78/0 0.90/0.22 1/0.85':"
+    "g='0/0 0.80/0 0.92/0.16 1/0.72':"
+    "b='0/0 0.84/0 0.95/0.09 1/0.55',"
+    f"gblur=sigma=7,scale={W}:{H},"
+    # halation is red-dominant, but only mildly: more separation reads as a cast
+    "colorchannelmixer=rr=1.0:gg=0.80:bb=0.66[hg];"
+    "[hbase][hg]blend=all_mode=screen:all_opacity=0.22,format=yuv420p"
 )
 
 # Filmic contrast: an S-curve that lifts the toe (no crushed blacks) and rolls the
@@ -76,3 +83,48 @@ def frame_filter(src_w, src_h, cx, cy, zoom=1.0, dur=None, fps=30, move=None):
     else:
         chain += f",scale={W}:{H}:flags=lanczos"
     return chain
+
+
+def fit_whole(src_w, src_h, dur=None, fps=30, zoom=1.0, seed=0):
+    """Show the entire frame inside 9:16, filling the rest with a blurred copy.
+
+    Cropping a landscape shot to 9:16 throws away two thirds of the picture. When
+    what is in the frame matters -- a view, a table of food, both people side by
+    side -- the whole image goes in the middle and its own blurred, darkened
+    enlargement fills above and below, so nothing is lost and the frame still
+    reads as one picture rather than a photo on black bars.
+    """
+    src_ar = src_w / src_h
+    # foreground: whole image, as wide as the frame allows
+    fw = W
+    fh = int(round(W / src_ar / 2) * 2)
+    if fh > H:                       # already tall: fall back to filling height
+        fh = H; fw = int(round(H * src_ar / 2) * 2)
+    chain = (
+        f"split=2[wbg][wfg];"
+        f"[wbg]scale={W}:{H}:force_original_aspect_ratio=increase:flags=fast_bilinear,"
+        f"crop={W}:{H},gblur=sigma=42,eq=brightness=-0.16:saturation=0.72[wbgo];"
+        f"[wfg]scale={fw}:{fh}:flags=lanczos[wfgo];"
+        f"[wbgo][wfgo]overlay=(W-w)/2:(H-h)/2"
+    )
+    if zoom > 1.0 and dur:
+        frames = max(1, int(round(dur * fps)))
+        z = f"'min(1+(on/{frames})*{zoom-1:.5f},{zoom})'"
+        chain += (f",zoompan=z={z}:d={frames}:x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2'"
+                  f":s={W}x{H}:fps={fps}")
+    return chain
+
+
+def needs_whole(src_w, src_h, faces_span=None):
+    """True when cropping to 9:16 would cost too much of the picture.
+
+    A 4:3 frame loses about half its width; 16:9 loses two thirds. Anything wider
+    than roughly 1.2:1 is shown whole unless the subject is a face filling the
+    middle, where a crop is the better, closer framing.
+    """
+    ar = src_w / src_h
+    if ar <= 1.15:
+        return False
+    if faces_span is not None and faces_span > 0.42:
+        return False      # faces already fill the width: crop in on them
+    return True

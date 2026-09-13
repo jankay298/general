@@ -766,7 +766,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--keep-workdir", action="store_true", help="do not delete the scratch directory")
     p.add_argument("--keep-duplicates", action="store_true",
                    help="keep re-imported copies and near-identical shots")
-    p.add_argument("--similarity", type=int, default=6,
+    p.add_argument("--similarity", type=int, default=10,
                    help="how alike two photos must be to count as duplicates "
                         "(0-64, lower is stricter; -1 compares copies by name only)")
     p.add_argument("--limit", type=int, default=0, help="only use the first N files (for a quick test)")
