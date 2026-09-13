@@ -9,6 +9,7 @@ import music
 
 S = Path("/tmp/claude-0/-home-user-general/06cb9692-f1ed-541f-8ed7-e9c306cec4f3/scratchpad")
 B = S/"edit/build"; SEG = B/"seg"; SEG.mkdir(parents=True, exist_ok=True)
+PCACHE = B/"photos"; PCACHE.mkdir(parents=True, exist_ok=True)
 OUT = S/"output"; OUT.mkdir(exist_ok=True)
 FPS, SR = 30, 44100
 LEAD, TAIL = 0.40, 0.30          # J-cut / L-cut overlap for speech
@@ -17,12 +18,15 @@ pm = json.load(open(S/"edit/data/photos.json"))
 vm = json.load(open(S/"edit/data/videoframes.json"))
 
 MOOD = {
- "arrival":"wistful","morning":"warm","parking":"playful","belem":"warm","alfama":"warm",
- "cat":"playful","tacos_pre":"playful","tacos_post":"playful","orange":"playful",
- "orange2":"playful","drive":"city","wine":"playful","d3_start":"warm","sintra":"wistful",
- "cave":"playful","regaleira":"wistful","bbq_pre":"city","bbq":"city","bbq_post":"city",
- "night":"tender","phase":"tender","lastday":"farewell","nata":"tender","bridge":"farewell",
- "home":"warm","outro":"farewell",
+ "arrival":"modern_night","morning":"modern_warm","parking":"modern_bright",
+ "belem":"modern_warm","alfama":"modern_warm","cat":"modern_bright",
+ "tacos_pre":"modern_bright","tacos_post":"modern_bright","orange":"modern_bright",
+ "orange2":"modern_bright","drive":"modern_drive","wine":"modern_bright",
+ "d3_start":"modern_warm","sintra":"modern_night","cave":"modern_drive",
+ "regaleira":"modern_night","bbq_pre":"modern_drive","bbq":"modern_drive",
+ "bbq_post":"modern_drive","night":"modern_soft","phase":"modern_soft",
+ "lastday":"modern_close","nata":"modern_soft","bridge":"modern_close",
+ "home":"modern_warm","outro":"modern_close",
 }
 MOVES = [None, "in", "out", "up", "down", "left", "right"]
 
@@ -32,7 +36,45 @@ def run(cmd, **kw):
         raise RuntimeError(f"failed: {' '.join(str(c) for c in cmd[:10])}\n{r.stderr[-900:]}")
     return r
 
+def prepared_photo(path):
+    """Decode a photo to an upright JPEG before ffmpeg sees it.
+
+    Two reasons this cannot be skipped: ffmpeg on Ubuntu cannot read HEIC at all,
+    and it ignores the EXIF orientation flag on stills -- so a portrait photo
+    arrives rotated while the measured dimensions (taken through Pillow, which
+    does apply the flag) say otherwise. Filters sized from those dimensions then
+    ask crop for a window larger than the frame and the render dies.
+    """
+    import pillow_heif, PIL.Image as Image, PIL.ImageOps as ImageOps
+    pillow_heif.register_heif_opener()
+    digest = hashlib.md5(path.encode("utf-8")).hexdigest()[:16]
+    out = PCACHE/f"{digest}.jpg"
+    if out.exists() and out.stat().st_size > 1000:
+        return str(out)
+    with Image.open(path) as img:
+        img = ImageOps.exif_transpose(img)
+        if img.mode != "RGB": img = img.convert("RGB")
+        img.thumbnail((W*2, H*2), Image.LANCZOS)
+        img.save(out, "JPEG", quality=96, subsampling=0)
+    return str(out)
+
 def dims(path):
+    # Ask ffmpeg what IT will produce: a phone video carries a rotation matrix,
+    # and ffmpeg applies it while ffprobe's raw width/height (and OpenCV's) do
+    # not, so trusting those swaps the sides on every portrait clip.
+    r = subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries",
+                        "stream=width,height:stream_side_data=rotation","-of","json",path],
+                       capture_output=True, text=True)
+    try:
+        st = json.loads(r.stdout)["streams"][0]
+        w, h = int(st["width"]), int(st["height"])
+        rot = 0
+        for sd in st.get("side_data_list", []) or []:
+            if "rotation" in sd: rot = abs(int(sd["rotation"])) % 180
+        if rot == 90: w, h = h, w
+        return w, h
+    except Exception:
+        pass
     m = pm.get(path)
     if m: return m["w"], m["h"]
     fr = vm.get(path) or []
@@ -67,7 +109,13 @@ def render_shot(args):
     out = SEG/f"{i:04d}.mp4"
     if out.exists() and playable(out, s["dur"]): return str(out)
     if out.exists(): out.unlink()
-    w, h = dims(s["path"])
+    src = s["path"]
+    if s["kind"] == "photo":
+        src = prepared_photo(s["path"])
+        from PIL import Image as _I
+        with _I.open(src) as _im: w, h = _im.size
+    else:
+        w, h = dims(s["path"])
     dur = s["dur"]
     if s["kind"] == "photo":
         # vary the move per shot, deterministically, so montages breathe
@@ -86,7 +134,7 @@ def render_shot(args):
     if s.get("fade_out"): vf += f",fade=t=out:st={max(0,dur-s['fade_out']):.2f}:d={s['fade_out']}"
     cmd = ["ffmpeg","-hide_banner","-loglevel","error","-y","-nostdin"]
     if s["kind"] == "photo":
-        cmd += ["-loop","1","-t",f"{dur:.3f}","-i",s["path"]]
+        cmd += ["-loop","1","-t",f"{dur:.3f}","-i",src]
     else:
         cmd += ["-ss",f"{s.get('tin',0):.3f}","-t",f"{dur:.3f}","-i",s["path"]]
     cmd += ["-an","-vf",vf,"-c:v","libx264","-preset","medium","-crf","17",
@@ -116,14 +164,14 @@ def build_score(beats_timeline, total):
     track = np.zeros(int(total*SR)+SR, dtype=np.float32)
     runs = []
     for b in beats_timeline:
-        mood = MOOD.get(b["beat"], "warm")
+        mood = MOOD.get(b["beat"], "modern_warm")
         if runs and runs[-1][0] == mood and abs(runs[-1][2] - b["start"]) < 0.05:
             runs[-1][2] = b["end"]
         else:
             runs.append([mood, b["start"], b["end"]])
     for n, (mood, a, b) in enumerate(runs):
         dur = b - a + 2.0
-        piece = music.render(mood, dur, seed=n*13+7)
+        piece = music.render_modern(mood, dur, seed=n*13+7)
         fi, fo = int(1.2*SR), int(1.6*SR)
         if len(piece) > fi+fo:
             piece[:fi] *= np.linspace(0,1,fi); piece[-fo:] *= np.linspace(1,0,fo)

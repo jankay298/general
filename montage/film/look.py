@@ -58,13 +58,15 @@ def frame_filter(src_w, src_h, cx, cy, zoom=1.0, dur=None, fps=30, move=None):
     detector found any. Cropping blind to that is what puts people's heads
     outside the frame when a landscape shot becomes vertical.
     """
-    src_ar = src_w / src_h
     pad = max(1.0, zoom)
     tw, th = int(W * pad), int(H * pad)
-    if src_ar > TARGET_AR:            # wider than 9:16 -> fill height, crop width
-        sw = int(round(th * src_ar / 2) * 2); sh = th
-    else:                              # taller -> fill width, crop height
-        sw = tw; sh = int(round(tw / src_ar / 2) * 2)
+    # Scale so BOTH sides cover the crop window, rounding UP to even numbers.
+    # Deriving one side from the other and rounding to nearest can land a pixel
+    # short: a source already at exactly 9:16 came out 2034 high against a 2035
+    # crop, and ffmpeg rejects the filter outright rather than clamping.
+    factor = max(tw / src_w, th / src_h)
+    sw = max(tw, int(-(-src_w * factor // 2) * 2))
+    sh = max(th, int(-(-src_h * factor // 2) * 2))
     max_x, max_y = max(0, sw - tw), max(0, sh - th)
     x = min(max(cx * sw - tw / 2, 0), max_x)
     y = min(max(cy * sh - th / 2, 0), max_y)
