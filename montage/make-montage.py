@@ -328,6 +328,85 @@ def select(
     return chosen
 
 
+
+# --------------------------------------------------------------------- duplicates
+
+def perceptual_hash(path: Path, size: int = 8) -> int | None:
+    """A 64-bit difference hash: brightness compared left-to-right across a grid.
+
+    Robust to the re-compression that a shared or re-imported copy goes through,
+    which is exactly what byte-level comparison misses -- those files differ in
+    every byte while showing the identical picture.
+    """
+    from PIL import Image
+
+    try:
+        with Image.open(path) as img:
+            small = img.convert("L").resize((size + 1, size), Image.LANCZOS)
+            px = list(small.tobytes())
+    except Exception:  # noqa: BLE001 - an unreadable file simply is not compared
+        return None
+    bits = 0
+    for row in range(size):
+        base = row * (size + 1)
+        for col in range(size):
+            bits = (bits << 1) | int(px[base + col] > px[base + col + 1])
+    return bits
+
+
+def drop_duplicates(items: list[Item], jobs: int, threshold: int) -> list[Item]:
+    """Remove re-imported copies and near-identical frames, keeping one of each.
+
+    Two things produce doubles in a phone album: a copy re-imported beside the
+    original ("IMG_9442 2.MP4"), and bursts of nearly the same shot. Both would
+    otherwise play twice in a row.
+    """
+    import re
+
+    names = {i.path.name for i in items}
+    kept: list[Item] = []
+    copies = 0
+    for item in items:
+        # Apple appends " 2" to a file re-imported next to one of the same name.
+        original = re.sub(r" \d+(\.[A-Za-z0-9]+)$", r"\1", item.path.name)
+        if original != item.path.name and original in names:
+            copies += 1
+            continue
+        kept.append(item)
+    if copies:
+        log(f"Dropped {copies} re-imported copies")
+
+    photos = [i for i in kept if i.kind == "photo"]
+    if threshold < 0 or len(photos) < 2:
+        return kept
+
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        hashes = list(pool.map(lambda i: perceptual_hash(i.path), photos))
+
+    # Compare each photo with the recent ones only: near-duplicates are bursts
+    # taken seconds apart, and this keeps an 800-photo album from turning into
+    # 320,000 comparisons.
+    window = 12
+    drop: set[int] = set()
+    for idx in range(len(photos)):
+        if hashes[idx] is None or idx in drop:
+            continue
+        for other in range(idx + 1, min(idx + 1 + window, len(photos))):
+            if hashes[other] is None or other in drop:
+                continue
+            if bin(hashes[idx] ^ hashes[other]).count("1") <= threshold:
+                # Keep whichever file is larger; a re-compressed copy is smaller
+                # than the original it was made from.
+                loser = other if photos[other].path.stat().st_size <= photos[idx].path.stat().st_size else idx
+                drop.add(loser)
+                if loser == idx:
+                    break
+    if drop:
+        log(f"Dropped {len(drop)} near-identical photos")
+    dropped_paths = {photos[i].path for i in drop}
+    return [i for i in kept if i.path not in dropped_paths]
+
+
 # ------------------------------------------------------------------------ rendering
 
 def prepare_photo(item: Item, cache: Path, width: int, height: int) -> Path | None:
@@ -509,29 +588,50 @@ def xfade_group(
     for path, _ in segments:
         cmd += ["-i", str(path)]
 
-    video_parts, audio_parts = [], []
+    video_parts = []
     offset = segments[0][1] - fade
     total = segments[0][1]
     label = "0:v"
-    alabel = "0:a"
+    # Where each clip starts on the finished timeline, reused for the audio below.
+    starts = [0.0]
     for i in range(1, len(segments)):
         nxt = f"v{i}"
         video_parts.append(
             f"[{label}][{i}:v]xfade=transition={opts.transition_style}:"
             f"duration={fade:.3f}:offset={offset:.3f}[{nxt}]"
         )
-        if opts.keep_audio:
-            na = f"a{i}"
-            audio_parts.append(f"[{alabel}][{i}:a]acrossfade=d={fade:.3f}:c1=tri:c2=tri[{na}]")
-            alabel = na
         label = nxt
+        starts.append(total - fade)
         total += segments[i][1] - fade
         offset = total - fade
+
+    audio_parts = []
+    if opts.keep_audio:
+        # Chaining acrossfade would be the obvious way to do this and is a trap:
+        # each link buffers its first input, so by the end of a 25-clip chain one
+        # filter is holding the whole group's audio and ffmpeg is killed for it.
+        # Delaying each track to its own start and summing them streams instead,
+        # and overlapping fades sound the same as a crossfade.
+        mix_labels = []
+        for i, (_, dur) in enumerate(segments):
+            chain = []
+            if i > 0:  # no fade-in on the first clip: the group is faded as a whole later
+                chain.append(f"afade=t=in:st=0:d={fade:.3f}")
+            if i < len(segments) - 1:
+                chain.append(f"afade=t=out:st={max(0.0, dur - fade):.3f}:d={fade:.3f}")
+            delay = int(round(starts[i] * 1000))
+            chain.append(f"adelay={delay}|{delay}")
+            audio_parts.append(f"[{i}:a]{','.join(chain)}[m{i}]")
+            mix_labels.append(f"[m{i}]")
+        audio_parts.append(
+            f"{''.join(mix_labels)}amix=inputs={len(segments)}:"
+            f"normalize=0:dropout_transition=0[aout]"
+        )
 
     graph = ";".join(video_parts + audio_parts)
     cmd += ["-filter_complex", graph, "-map", f"[{label}]"]
     if opts.keep_audio:
-        cmd += ["-map", f"[{alabel}]", "-c:a", "aac", "-b:a", "192k", "-ar", str(opts.audio_rate)]
+        cmd += ["-map", "[aout]", "-c:a", "aac", "-b:a", "192k", "-ar", str(opts.audio_rate)]
     else:
         cmd += ["-an"]
     # Intermediates are re-encoded again later, so they trade size for speed at a
@@ -577,8 +677,10 @@ def join_with_transitions(
             return gi, target, xfade_group(group, target, opts, final=final)
 
         # The final pass is one long job; giving it the whole machine beats running
-        # it on a single worker while three sit idle.
-        workers = 1 if final else opts.jobs
+        # it on a single worker while three sit idle. Earlier passes are capped
+        # well below the core count because each one holds a whole group's worth
+        # of decoded video: four at once is what the OOM killer came for.
+        workers = 1 if final else max(1, min(opts.jobs, opts.join_jobs))
         with ThreadPoolExecutor(max_workers=workers) as pool:
             for gi, target, dur in pool.map(work, list(enumerate(groups))):
                 results[gi] = (target, dur)
@@ -655,11 +757,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                    help="quality of intermediate segments, kept high to survive re-encoding")
     p.add_argument("--group-size", type=int, default=25,
                    help="minimum segments crossfaded per batch (raised automatically for big albums)")
+    p.add_argument("--join-jobs", type=int, default=2,
+                   help="parallel ffmpeg jobs during crossfade passes (memory-bound)")
     p.add_argument("--intermediate-preset", default="veryfast",
                    help="libx264 preset for intermediate crossfade passes")
     p.add_argument("--audio-rate", type=int, default=48000, help="audio sample rate")
     p.add_argument("--workdir", type=Path, help="scratch directory (default: a temporary one)")
     p.add_argument("--keep-workdir", action="store_true", help="do not delete the scratch directory")
+    p.add_argument("--keep-duplicates", action="store_true",
+                   help="keep re-imported copies and near-identical shots")
+    p.add_argument("--similarity", type=int, default=6,
+                   help="how alike two photos must be to count as duplicates "
+                        "(0-64, lower is stricter; -1 compares copies by name only)")
     p.add_argument("--limit", type=int, default=0, help="only use the first N files (for a quick test)")
     return p.parse_args(argv)
 
@@ -713,6 +822,8 @@ def main(argv: list[str]) -> int:
         videos = drop_live_photo_videos(photos, videos)
 
         items = build_items(photos, videos, workdir)
+        if not opts.keep_duplicates:
+            items = drop_duplicates(items, opts.jobs, opts.similarity)
         if opts.limit:
             items = items[:opts.limit]
         items = select(items, opts.max_minutes, opts.photo_duration, opts.video_max, opts.transition)
@@ -767,6 +878,12 @@ def main(argv: list[str]) -> int:
         size = opts.output.stat().st_size / 1e6
         log(f"Done: {opts.output} -- {int(length // 60)}m {int(length % 60)}s, {size:.0f} MB")
         return 0
+    except BaseException:
+        # A failure in the final join should not throw away every rendered
+        # segment -- that is the expensive part and it is still perfectly good.
+        log(f"Failed; leaving the work in {workdir}")
+        owns_workdir = False
+        raise
     finally:
         if owns_workdir and not opts.keep_workdir:
             shutil.rmtree(workdir, ignore_errors=True)
