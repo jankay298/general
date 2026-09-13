@@ -288,15 +288,23 @@ def build_items(photos: list[Path], videos: list[Path], workdir: Path) -> list[I
     return items
 
 
-def select(items: list[Item], max_minutes: float, photo_dur: float, video_max: float) -> list[Item]:
+def select(
+    items: list[Item], max_minutes: float, photo_dur: float, video_max: float, transition: float
+) -> list[Item]:
     """Thin the album down to a target runtime, spreading the cuts across the trip."""
     if max_minutes <= 0:
         return items
 
-    def cost(item: Item) -> float:
+    def length(item: Item) -> float:
         return photo_dur if item.kind == "photo" else min(item.duration or video_max, video_max)
 
-    budget = max_minutes * 60
+    # Every clip but the first overlaps its predecessor by the crossfade, so it
+    # only adds length - transition to the film. Ignoring that overshoots the
+    # count and lands a "six minute" film at barely five.
+    def cost(item: Item) -> float:
+        return max(0.1, length(item) - transition)
+
+    budget = max_minutes * 60 - transition
     total = sum(cost(i) for i in items)
     if total <= budget:
         return items
@@ -306,7 +314,8 @@ def select(items: list[Item], max_minutes: float, photo_dur: float, video_max: f
     keep = max(1, int(len(items) * budget / total))
     step = len(items) / keep
     chosen = [items[min(len(items) - 1, int(i * step))] for i in range(keep)]
-    log(f"Trimmed {len(items)} clips to {len(chosen)} to fit {max_minutes:g} minutes")
+    runtime = sum(cost(i) for i in chosen) + transition
+    log(f"Trimmed {len(items)} clips to {len(chosen)}: about {runtime / 60:.1f} minutes of film")
     return chosen
 
 
@@ -697,7 +706,7 @@ def main(argv: list[str]) -> int:
         items = build_items(photos, videos, workdir)
         if opts.limit:
             items = items[:opts.limit]
-        items = select(items, opts.max_minutes, opts.photo_duration, opts.video_max)
+        items = select(items, opts.max_minutes, opts.photo_duration, opts.video_max, opts.transition)
         span = f"{items[0].taken:%d %b %Y} to {items[-1].taken:%d %b %Y}"
         log(f"{len(items)} clips spanning {span}")
 
