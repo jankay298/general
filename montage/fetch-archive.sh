@@ -36,7 +36,9 @@ case "$URL" in
     # virus scan, so a plain GET saves the warning page instead of the file.
     [ -n "$OUT" ] || OUT="lissabon.zip"
     log "Google Drive link; downloading with gdown"
-    python3 -m gdown --fuzzy --continue -O "$OUT" "$URL"
+    # gdown 6 dropped --fuzzy (it parses share URLs by default) and errors out on
+    # the flag, so passing it fails before a byte is transferred.
+    python3 -m gdown --continue -O "$OUT" "$URL"
     ;;
   *)
     if [[ "$URL" == *dropbox.com* ]]; then

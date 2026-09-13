@@ -49,16 +49,27 @@ VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".3gp", ".mts", ".m2ts
 JUNK_NAMES = {".ds_store", "thumbs.db", "desktop.ini"}
 JUNK_SUFFIXES = {".aae", ".xmp", ".thm", ".json", ".txt", ".plist"}
 
-# Tags are read in this order; the first one that parses wins. File modification
-# time is deliberately absent -- zipping rewrites it, so trusting it would date
-# every undated file to the moment the archive was unpacked.
+# Timestamps are gathered from all of these and the EARLIEST plausible one wins.
+# A capture is the first thing that ever happens to a file; exporting, copying and
+# zipping only ever stamp it with a later time. On a freshly exported phone album
+# CreateDate, MediaCreateDate and TrackCreateDate all read "export day", while the
+# true time survives in QuickTime's CreationDate, in DateTimeOriginal, or -- for
+# files carrying no capture tag at all -- in the archive's own modification time.
+# Taking the earliest picks the real one without having to know which tag was
+# rewritten this time.
 DATE_TAGS = [
     "SubSecDateTimeOriginal",
     "DateTimeOriginal",
+    "CreationDate",
     "CreateDate",
     "MediaCreateDate",
     "TrackCreateDate",
+    "FileModifyDate",
 ]
+
+# Digital cameras did not exist before this, so anything earlier is a broken tag
+# (QuickTime's 1904 epoch, or a camera whose clock was never set) rather than a date.
+EARLIEST_PLAUSIBLE = datetime(1990, 1, 1)
 
 
 @dataclass
@@ -211,11 +222,9 @@ def read_timestamps(paths: list[Path], workdir: Path) -> dict[Path, tuple[dateti
     result: dict[Path, tuple[datetime | None, float]] = {}
     for record in records:
         path = Path(record.get("SourceFile", ""))
-        taken = None
-        for tag in DATE_TAGS:
-            taken = parse_exif_date(str(record.get(tag, "")))
-            if taken:
-                break
+        stamps = [parse_exif_date(str(record.get(tag, ""))) for tag in DATE_TAGS]
+        plausible = [t for t in stamps if t and t >= EARLIEST_PLAUSIBLE]
+        taken = min(plausible) if plausible else None
         try:
             duration = float(record.get("Duration", 0) or 0)
         except (TypeError, ValueError):
@@ -281,7 +290,7 @@ def build_items(photos: list[Path], videos: list[Path], workdir: Path) -> list[I
 
     undated = sum(1 for i in items if not i.dated)
     if undated:
-        log(f"{undated} file(s) had no capture date; placed by filename order")
+        log(f"{undated} file(s) carried no timestamp at all; placed by filename order")
         infer_missing_dates(items)
     # Sort by name within the same second so burst shots keep their shot order.
     items.sort(key=lambda i: (i.taken, i.path.name))
