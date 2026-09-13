@@ -1,0 +1,947 @@
+#!/usr/bin/env python3
+"""make-video -- build one video out of a folder of photos and videos.
+
+Scans a folder, orders everything by the time it was taken, gives every photo a
+slow Ken Burns move and every video a trimmed clip, cross-fades between them,
+and lays an optional music bed underneath.
+
+Needs ffmpeg and ffprobe. exiftool is used when it is installed (better capture
+dates, HEIC support); everything still works without it. No Python packages.
+
+    make-video ~/Pictures/holiday --target-duration 6:00 --music bed.mp3
+
+Run with --plan first to see the running order without rendering anything.
+"""
+
+from __future__ import annotations
+
+import argparse
+import concurrent.futures
+import dataclasses
+import datetime as dt
+import hashlib
+import json
+import os
+import random
+import re
+import shutil
+import struct
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+PHOTO_EXT = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".webp", ".tif", ".tiff",
+             ".bmp", ".avif", ".gif", ".dng"}
+VIDEO_EXT = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm", ".3gp", ".3g2",
+             ".mts", ".m2ts", ".mpg", ".mpeg", ".wmv", ".flv", ".ogv"}
+AUDIO_EXT = {".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".opus", ".wma"}
+
+# EXIF orientation -> the filter that undoes it. Whether ffmpeg straightens a
+# still by itself depends on its version (6.1 does, 5.x does not), so photos are
+# read with -noautorotate and turned here instead. Video is left to ffmpeg's own
+# autorotate, which has handled the display matrix for years.
+ORIENT_FILTER = {
+    2: "hflip",
+    3: "hflip,vflip",
+    4: "vflip",
+    5: "transpose=0",
+    6: "transpose=1",
+    7: "transpose=3",
+    8: "transpose=2",
+}
+
+FFMPEG = ["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-y"]
+
+_print_lock = threading.Lock()
+
+
+def say(msg: str) -> None:
+    with _print_lock:
+        print(msg, flush=True)
+
+
+def die(msg: str) -> None:
+    sys.stderr.write(f"make-video: {msg}\n")
+    raise SystemExit(1)
+
+
+def run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
+    cp = subprocess.run(cmd, capture_output=True, text=True)
+    if check and cp.returncode != 0:
+        tail = (cp.stderr or cp.stdout or "").strip().splitlines()[-12:]
+        raise RuntimeError("command failed: " + " ".join(cmd[:6]) + " ...\n" + "\n".join(tail))
+    return cp
+
+
+def have(tool: str) -> bool:
+    return shutil.which(tool) is not None
+
+
+def hms(seconds: float) -> str:
+    seconds = max(0.0, seconds)
+    h, rest = divmod(int(round(seconds)), 3600)
+    m, s = divmod(rest, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def parse_duration(text: str) -> float:
+    """Accept 90, 1:30 or 1:02:03."""
+    parts = text.strip().split(":")
+    try:
+        nums = [float(p) for p in parts]
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a duration: {text!r}")
+    total = 0.0
+    for n in nums:
+        total = total * 60 + n
+    return total
+
+
+def parse_date(text: str) -> dt.datetime:
+    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m"):
+        try:
+            return dt.datetime.strptime(text, fmt)
+        except ValueError:
+            pass
+    raise argparse.ArgumentTypeError(f"not a date: {text!r} (use YYYY-MM-DD)")
+
+
+# --------------------------------------------------------------------------
+# reading metadata
+# --------------------------------------------------------------------------
+
+def _exif_blob(path: Path) -> bytes | None:
+    """The raw TIFF block out of a JPEG's APP1 segment."""
+    with path.open("rb") as fh:
+        if fh.read(2) != b"\xff\xd8":
+            return None
+        while True:
+            byte = fh.read(1)
+            while byte == b"\xff":            # skip fill bytes
+                byte = fh.read(1)
+            if not byte:
+                return None
+            marker = byte[0]
+            if marker in (0xD8, 0x01) or 0xD0 <= marker <= 0xD7:
+                byte = fh.read(1)
+                continue
+            if marker in (0xDA, 0xD9):        # start of scan / end of image
+                return None
+            raw = fh.read(2)
+            if len(raw) < 2:
+                return None
+            size = struct.unpack(">H", raw)[0] - 2
+            if size < 0:
+                return None
+            data = fh.read(size)
+            if marker == 0xE1 and data[:6] == b"Exif\x00\x00":
+                return data[6:]
+            if fh.read(1) != b"\xff":
+                return None
+            fh.seek(-1, os.SEEK_CUR)
+
+
+def read_exif(path: Path) -> tuple[dt.datetime | None, int | None]:
+    """(capture time, orientation) straight from the file, no dependencies."""
+    try:
+        blob = _exif_blob(path)
+        if not blob or len(blob) < 8:
+            return None, None
+        end = "<" if blob[:2] == b"II" else ">" if blob[:2] == b"MM" else None
+        if end is None:
+            return None, None
+        first_ifd = struct.unpack(end + "I", blob[4:8])[0]
+
+        def entries(offset: int) -> dict[int, tuple[int, int, int]]:
+            out: dict[int, tuple[int, int, int]] = {}
+            if offset <= 0 or offset + 2 > len(blob):
+                return out
+            count = struct.unpack(end + "H", blob[offset:offset + 2])[0]
+            for i in range(min(count, 512)):
+                at = offset + 2 + i * 12
+                if at + 12 > len(blob):
+                    break
+                tag, typ, cnt = struct.unpack(end + "HHI", blob[at:at + 8])
+                out[tag] = (typ, cnt, at + 8)
+            return out
+
+        def ascii_at(entry) -> str | None:
+            typ, cnt, val_at = entry
+            if typ != 2 or cnt == 0:
+                return None
+            if cnt > 4:
+                off = struct.unpack(end + "I", blob[val_at:val_at + 4])[0]
+            else:
+                off = val_at
+            raw = blob[off:off + cnt]
+            return raw.split(b"\x00")[0].decode("ascii", "ignore") or None
+
+        def short_at(entry) -> int | None:
+            typ, cnt, val_at = entry
+            if typ not in (3, 4) or cnt == 0:
+                return None
+            fmt = "H" if typ == 3 else "I"
+            return struct.unpack(end + fmt, blob[val_at:val_at + struct.calcsize(fmt)])[0]
+
+        ifd0 = entries(first_ifd)
+        orientation = short_at(ifd0[0x0112]) if 0x0112 in ifd0 else None
+
+        stamp = None
+        sub = {}
+        if 0x8769 in ifd0:
+            ptr = short_at(ifd0[0x8769])
+            if ptr:
+                sub = entries(ptr)
+        for tags, table in ((0x9003, sub), (0x9004, sub), (0x0132, ifd0)):
+            if tags in table:
+                text = ascii_at(table[tags])
+                if text:
+                    try:
+                        stamp = dt.datetime.strptime(text.strip(), "%Y:%m:%d %H:%M:%S")
+                        break
+                    except ValueError:
+                        pass
+        return stamp, orientation
+    except Exception:
+        return None, None
+
+
+def exiftool_scan(paths: list[Path]) -> dict[str, dict]:
+    """One exiftool call for every file -- much faster than one call each."""
+    if not paths or not have("exiftool"):
+        return {}
+    args = ["exiftool", "-j", "-n", "-q", "-fast2",
+            "-DateTimeOriginal", "-CreateDate", "-MediaCreateDate",
+            "-GPSDateTime", "-FileModifyDate", "-Orientation", "-SourceFile",
+            "-@", "-"]
+    cp = subprocess.run(args, input="\n".join(str(p) for p in paths),
+                        capture_output=True, text=True)
+    if cp.returncode != 0 and not cp.stdout.strip():
+        return {}
+    try:
+        records = json.loads(cp.stdout or "[]")
+    except json.JSONDecodeError:
+        return {}
+    return {rec.get("SourceFile", ""): rec for rec in records}
+
+
+def stamp_from_exiftool(rec: dict) -> dt.datetime | None:
+    for key in ("DateTimeOriginal", "CreateDate", "MediaCreateDate", "GPSDateTime"):
+        text = rec.get(key)
+        if not isinstance(text, str):
+            continue
+        text = re.sub(r"(\+|-)\d{2}:\d{2}$|Z$", "", text.strip()).strip()
+        text = text.split(".")[0]
+        for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                stamp = dt.datetime.strptime(text, fmt)
+                if stamp.year > 1980:
+                    return stamp
+            except ValueError:
+                pass
+    return None
+
+
+STAMP_IN_NAME = re.compile(r"(20\d{2}|19\d{2})[-_]?(\d{2})[-_]?(\d{2})")
+
+
+def stamp_from_name(path: Path) -> dt.datetime | None:
+    m = STAMP_IN_NAME.search(path.stem)
+    if not m:
+        return None
+    try:
+        return dt.datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return None
+
+
+def probe(path: Path) -> dict:
+    cp = run(["ffprobe", "-v", "error", "-print_format", "json",
+              "-show_format", "-show_streams", str(path)], check=False)
+    if cp.returncode != 0:
+        return {}
+    try:
+        return json.loads(cp.stdout)
+    except json.JSONDecodeError:
+        return {}
+
+
+# --------------------------------------------------------------------------
+# the running order
+# --------------------------------------------------------------------------
+
+@dataclasses.dataclass
+class Item:
+    path: Path
+    kind: str                      # "photo" | "video" | "card"
+    taken: dt.datetime
+    dated: bool = False            # True when taken came from metadata
+    src_duration: float = 0.0
+    orientation: int | None = None
+    has_audio: bool = False
+    start: float = 0.0             # where the clip starts inside the source
+    duration: float = 0.0          # how long it is on screen
+    text: str | None = None        # for title cards
+    source: Path | None = None     # decodable stand-in (converted HEIC)
+
+
+def gather(roots: list[Path], recursive: bool) -> list[Path]:
+    found: list[Path] = []
+    for root in roots:
+        if root.is_file():
+            found.append(root)
+            continue
+        if not root.is_dir():
+            die(f"no such file or folder: {root}")
+        walker = root.rglob("*") if recursive else root.glob("*")
+        for path in walker:
+            if path.is_file() and not path.name.startswith("."):
+                if path.suffix.lower() in PHOTO_EXT | VIDEO_EXT:
+                    found.append(path)
+    return sorted(set(found))
+
+
+def describe(paths: list[Path], jobs: int) -> list[Item]:
+    meta = exiftool_scan(paths)
+    items: list[Item] = []
+
+    def build(path: Path) -> Item:
+        kind = "photo" if path.suffix.lower() in PHOTO_EXT else "video"
+        rec = meta.get(str(path), {})
+        taken = stamp_from_exiftool(rec)
+        orientation = rec.get("Orientation") if isinstance(rec.get("Orientation"), int) else None
+        duration = 0.0
+        has_audio = False
+
+        if kind == "photo":
+            if taken is None or orientation is None:
+                file_stamp, file_orient = read_exif(path)
+                taken = taken or file_stamp
+                orientation = orientation if orientation is not None else file_orient
+        else:
+            info = probe(path)
+            fmt = info.get("format", {})
+            try:
+                duration = float(fmt.get("duration", 0.0))
+            except (TypeError, ValueError):
+                duration = 0.0
+            streams = info.get("streams", [])
+            has_audio = any(s.get("codec_type") == "audio" for s in streams)
+            if taken is None:
+                for tags in (fmt.get("tags", {}),):
+                    text = tags.get("creation_time") or tags.get("com.apple.quicktime.creationdate")
+                    if text:
+                        try:
+                            taken = dt.datetime.fromisoformat(text.replace("Z", "+00:00")).replace(tzinfo=None)
+                        except ValueError:
+                            pass
+
+        dated = taken is not None
+        if taken is None:
+            taken = stamp_from_name(path)
+            dated = taken is not None
+        if taken is None:
+            taken = dt.datetime.fromtimestamp(path.stat().st_mtime)
+        return Item(path=path, kind=kind, taken=taken, dated=dated,
+                    src_duration=duration, orientation=orientation, has_audio=has_audio)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+        items = list(pool.map(build, paths))
+    return items
+
+
+def group_count(count: int, cfg) -> int:
+    size = cfg.group_size if cfg.group_size > 0 else max(1, count)
+    return max(1, -(-count // size))
+
+
+def timeline_length(items: list[Item], cfg) -> float:
+    """Running time. Clips inside a group overlap; group borders are hard cuts."""
+    if not items:
+        return 0.0
+    overlaps = len(items) - group_count(len(items), cfg)
+    return sum(i.duration for i in items) - cfg.transition * overlaps
+
+
+def pick(items: list[Item], cfg) -> list[Item]:
+    """Trim the list down to the wanted count or running time."""
+    def span(chosen: list[Item]) -> float:
+        return timeline_length(chosen, cfg)
+
+    def sample(source: list[Item], count: int) -> list[Item]:
+        count = max(1, min(count, len(source)))
+        if count == len(source):
+            return source
+        step = (len(source) - 1) / (count - 1) if count > 1 else 0
+        picked = sorted({int(round(i * step)) for i in range(count)})
+        return [source[i] for i in picked]
+
+    chosen = items
+    if cfg.limit:
+        chosen = sample(chosen, cfg.limit)
+    if cfg.target_duration:
+        for _ in range(8):
+            current = span(chosen)
+            if current <= cfg.target_duration * 1.02:
+                break
+            ratio = cfg.target_duration / current
+            chosen = sample(items, max(1, int(len(chosen) * ratio)))
+    return chosen
+
+
+def lay_out(items: list[Item], cfg) -> list[Item]:
+    """Give every item its on-screen duration; drop what is too short to use."""
+    floor = cfg.transition + 0.25
+    kept: list[Item] = []
+    for item in items:
+        if item.kind == "photo":
+            item.duration = max(cfg.photo_duration, floor)
+        else:
+            usable = max(0.0, item.src_duration - cfg.video_skip)
+            if item.src_duration <= 0:
+                usable = cfg.max_clip
+            item.start = cfg.video_skip if usable > 0.5 else 0.0
+            item.duration = min(usable if usable > 0 else cfg.max_clip, cfg.max_clip)
+            if item.duration < floor:
+                say(f"  skipping {item.path.name}: only {item.duration:.1f}s long")
+                continue
+        kept.append(item)
+    return kept
+
+
+# --------------------------------------------------------------------------
+# rendering
+# --------------------------------------------------------------------------
+
+MOTIONS = ("in", "out", "left", "right", "up", "down")
+
+
+def ken_burns(motion: str, frames: int, zoom: float) -> tuple[str, str, str]:
+    """zoompan expressions for one still. Linear in the output frame number."""
+    last = max(1, frames - 1)
+    ramp = f"on/{last}"
+    if motion == "in":
+        z = f"1+{zoom - 1:.4f}*{ramp}"
+        x, y = "(iw-iw/zoom)/2", "(ih-ih/zoom)/2"
+    elif motion == "out":
+        z = f"{zoom:.4f}-{zoom - 1:.4f}*{ramp}"
+        x, y = "(iw-iw/zoom)/2", "(ih-ih/zoom)/2"
+    else:
+        z = f"{zoom:.4f}"
+        travel = {"left": ("(iw-iw/zoom)*(1-%s)" % ramp, "(ih-ih/zoom)/2"),
+                  "right": ("(iw-iw/zoom)*%s" % ramp, "(ih-ih/zoom)/2"),
+                  "up": ("(iw-iw/zoom)/2", "(ih-ih/zoom)*(1-%s)" % ramp),
+                  "down": ("(iw-iw/zoom)/2", "(ih-ih/zoom)*%s" % ramp)}
+        x, y = travel[motion]
+    return z, x, y
+
+
+def fit_chain(cfg, width: int, height: int, label_in: str, label_out: str) -> str:
+    """Put the source inside a width x height frame, however --fit asks for."""
+    if cfg.fit == "crop":
+        return (f"{label_in}scale={width}:{height}:force_original_aspect_ratio=increase:flags=lanczos,"
+                f"crop={width}:{height}{label_out}")
+    if cfg.fit == "pad":
+        return (f"{label_in}scale={width}:{height}:force_original_aspect_ratio=decrease:flags=lanczos,"
+                f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color={cfg.background}{label_out}")
+    small_w, small_h = max(16, width // 8), max(16, height // 8)
+    return (f"{label_in}split[bg_][fg_];"
+            f"[bg_]scale={small_w}:{small_h}:force_original_aspect_ratio=increase,"
+            f"crop={small_w}:{small_h},gblur=sigma=6,"
+            f"scale={width}:{height}:flags=bilinear,"
+            f"eq=brightness=-0.06:saturation=0.75[bgb_];"
+            f"[fg_]scale={width}:{height}:force_original_aspect_ratio=decrease:flags=lanczos[fg2_];"
+            f"[bgb_][fg2_]overlay=(W-w)/2:(H-h)/2{label_out}")
+
+
+def encode_args(cfg, crf: int, preset: str) -> list[str]:
+    return ["-c:v", "libx264", "-preset", preset, "-crf", str(crf),
+            "-pix_fmt", "yuv420p", "-r", str(cfg.fps),
+            "-g", str(cfg.fps * 2), "-keyint_min", str(cfg.fps),
+            "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2"]
+
+
+def segment_key(item: Item, cfg, motion: str) -> str:
+    try:
+        stat = item.path.stat()
+        stamp = (stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        stamp = (0, 0)
+    blob = json.dumps([str(item.path), stamp, item.kind, item.text, round(item.start, 3),
+                       round(item.duration, 3), motion, cfg.width, cfg.height, cfg.fps,
+                       cfg.fit, cfg.zoom, cfg.background, cfg.mute_videos,
+                       item.orientation, cfg.seg_crf, cfg.preset, 3], sort_keys=True)
+    return hashlib.sha1(blob.encode()).hexdigest()[:16]
+
+
+def decodable(item: Item, cfg) -> Path:
+    """HEIC needs a hand from exiftool/heif-convert/sips on most ffmpeg builds."""
+    if item.source is not None:
+        return item.source
+    path = item.path
+    if path.suffix.lower() not in {".heic", ".heif"} or cfg.ffmpeg_reads_heic:
+        item.source = path
+        return path
+    out = cfg.cache / ("heic-" + hashlib.sha1(str(path).encode()).hexdigest()[:16] + ".jpg")
+    if not out.exists():
+        for cmd in ([ "heif-convert", "-q", "92", str(path), str(out)],
+                    ["magick", str(path), str(out)],
+                    ["convert", str(path), str(out)],
+                    ["sips", "-s", "format", "jpeg", str(path), "--out", str(out)],
+                    ["exiftool", "-b", "-JpgFromRaw", "-w", str(out), str(path)]):
+            if not have(cmd[0]):
+                continue
+            if run(cmd, check=False).returncode == 0 and out.exists() and out.stat().st_size:
+                break
+        else:
+            raise RuntimeError(
+                f"cannot decode {path.name}: install libheif-examples (heif-convert) "
+                "or ImageMagick, or convert the HEIC files to JPEG first")
+    item.source = out
+    return out
+
+
+def render_segment(item: Item, cfg, index: int) -> Path:
+    motion = MOTIONS[0] if cfg.no_motion else cfg.motions[index % len(cfg.motions)]
+    out = cfg.cache / f"seg-{segment_key(item, cfg, motion)}.mkv"
+    if out.exists() and out.stat().st_size > 0:
+        return out
+    tmp = out.with_name(out.stem + ".part.mkv")
+    frames = max(2, int(round(item.duration * cfg.fps)))
+
+    if item.kind == "card":
+        cmd = FFMPEG + [
+            "-f", "lavfi", "-i", f"color=c={cfg.background}:s={cfg.width}x{cfg.height}:r={cfg.fps}:d={item.duration:.3f}",
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+        ]
+        text_file = cfg.cache / f"card-{index:05d}.txt"
+        text_file.write_text((item.text or "") + "\n", encoding="utf-8")
+        size = max(18, cfg.height // 12)
+        chain = (f"[0:v]drawtext=fontfile={cfg.font}:textfile={text_file}:"
+                 f"fontcolor=white:fontsize={size}:line_spacing={size // 3}:"
+                 f"x=(w-text_w)/2:y=(h-text_h)/2,"
+                 f"fade=t=in:st=0:d=0.7,fade=t=out:st={max(0.0, item.duration - 0.7):.3f}:d=0.7,"
+                 f"setsar=1,format=yuv420p[v]")
+        cmd += ["-filter_complex", chain, "-map", "[v]", "-map", "1:a",
+                "-t", f"{item.duration:.3f}"] + encode_args(cfg, cfg.seg_crf, cfg.preset) + ["-f", "matroska", str(tmp)]
+
+    elif item.kind == "photo":
+        source = decodable(item, cfg)
+        big_w, big_h = cfg.width * cfg.supersample, cfg.height * cfg.supersample
+        pre = []
+        turn = ORIENT_FILTER.get(item.orientation or 1)
+        if turn and not cfg.no_exif_rotate:
+            pre.append(turn)
+        head = "[0:v]" + (",".join(pre) + "," if pre else "")
+        chain = fit_chain(cfg, big_w, big_h, head, "[canvas]")
+        z, x, y = ken_burns(motion, frames, cfg.zoom)
+        chain += (f";[canvas]zoompan=z='{z}':x='{x}':y='{y}':d=1:"
+                  f"s={cfg.width}x{cfg.height}:fps={cfg.fps},setsar=1,format=yuv420p[v]")
+        cmd = FFMPEG + [
+            "-noautorotate",
+            "-loop", "1", "-framerate", str(cfg.fps), "-t", f"{item.duration:.3f}", "-i", str(source),
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-filter_complex", chain, "-map", "[v]", "-map", "1:a",
+            "-t", f"{item.duration:.3f}"] + encode_args(cfg, cfg.seg_crf, cfg.preset) + ["-f", "matroska", str(tmp)]
+
+    else:
+        chain = fit_chain(cfg, cfg.width, cfg.height, "[0:v]", "[fitted]")
+        chain += f";[fitted]fps={cfg.fps},setsar=1,format=yuv420p[v]"
+        keep_audio = item.has_audio and not cfg.mute_videos
+        cmd = FFMPEG + ["-ss", f"{item.start:.3f}", "-i", str(item.path)]
+        if not keep_audio:
+            cmd += ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]
+            audio_map = ["-map", "1:a"]
+        else:
+            chain += ";[0:a]aresample=48000,aformat=channel_layouts=stereo[a]"
+            audio_map = ["-map", "[a]"]
+        cmd += ["-filter_complex", chain, "-map", "[v]"] + audio_map
+        cmd += ["-t", f"{item.duration:.3f}"] + encode_args(cfg, cfg.seg_crf, cfg.preset) + ["-f", "matroska", str(tmp)]
+
+    run(cmd)
+    tmp.replace(out)
+    return out
+
+
+def actual_duration(path: Path) -> float:
+    cp = run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+              "-print_format", "default=nk=1:nw=1", str(path)], check=False)
+    try:
+        return float(cp.stdout.strip())
+    except ValueError:
+        return 0.0
+
+
+def join_group(paths: list[Path], durations: list[float], out: Path, cfg,
+               crf: int, preset: str) -> None:
+    """Cross-fade a handful of clips into one file."""
+    if len(paths) == 1:
+        shutil.copyfile(paths[0], out)
+        return
+    cmd = FFMPEG[:]
+    for path in paths:
+        cmd += ["-i", str(path)]
+    parts = []
+    v_in, a_in = "[0:v]", "[0:a]"
+    offset = durations[0]
+    trans = cfg.transition
+    for i in range(1, len(paths)):
+        v_out, a_out = f"[v{i}]", f"[a{i}]"
+        parts.append(f"{v_in}[{i}:v]xfade=transition={cfg.transition_name}:"
+                     f"duration={trans:.3f}:offset={max(0.0, offset - trans):.3f}{v_out}")
+        parts.append(f"{a_in}[{i}:a]acrossfade=d={trans:.3f}:c1=tri:c2=tri{a_out}")
+        v_in, a_in = v_out, a_out
+        offset += durations[i] - trans
+    tmp = out.with_name(out.stem + ".part.mkv")
+    cmd += ["-filter_complex", ";".join(parts), "-map", v_in, "-map", a_in]
+    cmd += encode_args(cfg, crf, preset) + ["-f", "matroska", str(tmp)]
+    run(cmd)
+    tmp.replace(out)
+
+
+def concat_copy(paths: list[Path], out: Path) -> None:
+    listing = out.with_suffix(".list.txt")
+    listing.write_text("".join("file '%s'\n" % str(p).replace("'", "'\\''") for p in paths),
+                       encoding="utf-8")
+    run(FFMPEG + ["-f", "concat", "-safe", "0", "-i", str(listing),
+                  "-c", "copy", "-f", "matroska", str(out)])
+    listing.unlink(missing_ok=True)
+
+
+def build_music_bed(sources: list[Path], cfg) -> Path | None:
+    tracks: list[Path] = []
+    for source in sources:
+        if source.is_dir():
+            tracks += sorted(p for p in source.iterdir()
+                             if p.is_file() and p.suffix.lower() in AUDIO_EXT)
+        elif source.is_file():
+            tracks.append(source)
+        else:
+            die(f"no such music file or folder: {source}")
+    if not tracks:
+        return None
+    out = cfg.cache / "music-bed.wav"
+    if out.exists():
+        return out
+    cmd = FFMPEG[:]
+    for track in tracks:
+        cmd += ["-i", str(track)]
+    if len(tracks) == 1:
+        cmd += ["-filter_complex", "[0:a]aresample=48000,aformat=channel_layouts=stereo[a]"]
+    else:
+        inputs = "".join(f"[{i}:a]" for i in range(len(tracks)))
+        cmd += ["-filter_complex",
+                f"{inputs}concat=n={len(tracks)}:v=0:a=1,aresample=48000,aformat=channel_layouts=stereo[a]"]
+    cmd += ["-map", "[a]", "-c:a", "pcm_s16le", str(out)]
+    run(cmd)
+    return out
+
+
+def finish(joined: Path, music: Path | None, out: Path, cfg) -> None:
+    total = actual_duration(joined)
+    cmd = FFMPEG + ["-i", str(joined)]
+    if music is not None:
+        cmd += ["-stream_loop", "-1", "-i", str(music)]
+        fade_out_at = max(0.0, total - cfg.music_fade)
+        bed = (f"[1:a]volume={cfg.music_volume},"
+               f"afade=t=in:st=0:d={min(cfg.music_fade, max(0.1, total / 4)):.2f},"
+               f"afade=t=out:st={fade_out_at:.3f}:d={cfg.music_fade:.2f}[bed]")
+        if cfg.mute_videos:
+            chain = bed + ";[bed]alimiter=limit=0.97[aout]"
+        elif cfg.duck:
+            chain = ("[0:a]asplit[keyA][keyB];" + bed +
+                     ";[bed][keyA]sidechaincompress=threshold=0.03:ratio=6:attack=25:release=600[ducked]"
+                     ";[keyB][ducked]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.97[aout]")
+        else:
+            chain = bed + ";[0:a][bed]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.97[aout]"
+        cmd += ["-filter_complex", chain, "-map", "0:v", "-map", "[aout]"]
+        silent = False
+    elif cfg.mute_videos:
+        cmd += ["-map", "0:v", "-an"]
+        silent = True
+    else:
+        cmd += ["-map", "0:v", "-map", "0:a"]
+        silent = False
+    cmd += ["-c:v", "copy", "-t", f"{total:.3f}"]
+    if not silent:
+        cmd += ["-c:a", "aac", "-b:a", "192k"]
+    cmd += ["-movflags", "+faststart", str(out)]
+    run(cmd)
+
+
+# --------------------------------------------------------------------------
+# command line
+# --------------------------------------------------------------------------
+
+PRESET_SIZES = {"1080p": (1920, 1080), "720p": (1280, 720), "4k": (3840, 2160),
+                "portrait": (1080, 1920), "square": (1080, 1080)}
+
+
+def parse_args(argv: list[str]):
+    p = argparse.ArgumentParser(
+        prog="make-video",
+        description="Build one video out of a folder of photos and videos.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""examples:
+  make-video ~/Pictures/holiday --plan
+  make-video ~/Pictures/holiday --target-duration 6:00 --music bed.mp3 -o holiday.mp4
+  make-video ~/Pictures -r --size portrait --fit crop --photo-duration 2.5
+""")
+    p.add_argument("input", nargs="+", type=Path, help="folders or files to use")
+    p.add_argument("-o", "--output", type=Path, default=Path("video.mp4"), help="output file (default: video.mp4)")
+    p.add_argument("-r", "--recursive", action="store_true", help="also search subfolders")
+    p.add_argument("--plan", action="store_true", help="print the running order and stop")
+
+    g = p.add_argument_group("what goes in")
+    g.add_argument("--target-duration", type=parse_duration, metavar="M:SS",
+                   help="thin the selection out evenly until it fits this running time")
+    g.add_argument("--limit", type=int, metavar="N", help="use at most N items, spread evenly")
+    g.add_argument("--since", type=parse_date, metavar="YYYY-MM-DD", help="ignore anything older")
+    g.add_argument("--until", type=parse_date, metavar="YYYY-MM-DD", help="ignore anything newer")
+    g.add_argument("--photos-only", action="store_true")
+    g.add_argument("--videos-only", action="store_true")
+    g.add_argument("--order", choices=("date", "name", "shuffle"), default="date")
+    g.add_argument("--seed", type=int, default=7, help="seed for shuffle and camera moves")
+
+    g = p.add_argument_group("timing")
+    g.add_argument("--photo-duration", type=float, default=3.5, metavar="SEC")
+    g.add_argument("--max-clip", type=float, default=10.0, metavar="SEC",
+                   help="longest piece taken from one video (default: 10)")
+    g.add_argument("--video-skip", type=float, default=0.0, metavar="SEC",
+                   help="skip this much at the start of every video")
+    g.add_argument("--transition", type=float, default=0.6, metavar="SEC", help="cross-fade length")
+    g.add_argument("--transition-name", default="fade",
+                   help="ffmpeg xfade transition, e.g. fade, dissolve, smoothleft (default: fade)")
+
+    g = p.add_argument_group("look")
+    g.add_argument("--size", default="1080p",
+                   help="1080p, 720p, 4k, portrait, square or WIDTHxHEIGHT (default: 1080p)")
+    g.add_argument("--fps", type=int, default=30)
+    g.add_argument("--fit", choices=("blur", "pad", "crop"), default="blur",
+                   help="how off-shape material fills the frame (default: blur)")
+    g.add_argument("--background", default="black", help="colour behind padded material")
+    g.add_argument("--zoom", type=float, default=1.10, help="Ken Burns zoom factor (default: 1.10)")
+    g.add_argument("--no-motion", action="store_true", help="still photos, no Ken Burns")
+    g.add_argument("--no-exif-rotate", action="store_true", help="do not straighten photos by EXIF")
+    g.add_argument("--title", metavar="TEXT", help="opening title card")
+    g.add_argument("--end-title", metavar="TEXT", help="closing card")
+    g.add_argument("--card-duration", type=float, default=3.5, metavar="SEC")
+    g.add_argument("--font", metavar="FILE", help="font file for the cards")
+
+    g = p.add_argument_group("sound")
+    g.add_argument("--music", type=Path, action="append", metavar="PATH",
+                   help="music file or folder; repeatable, looped to fit")
+    g.add_argument("--music-volume", type=float, default=0.28)
+    g.add_argument("--music-fade", type=float, default=4.0, metavar="SEC")
+    g.add_argument("--duck", action="store_true", help="dip the music when a video has sound")
+    g.add_argument("--mute-videos", action="store_true", help="drop the sound from the clips")
+
+    g = p.add_argument_group("machinery")
+    g.add_argument("--jobs", type=int, default=min(8, (os.cpu_count() or 4)))
+    g.add_argument("--crf", type=int, default=20, help="final quality, lower is better (default: 20)")
+    g.add_argument("--seg-crf", type=int, default=16, help="intermediate quality (default: 16)")
+    g.add_argument("--preset", default="medium", help="x264 preset (default: medium)")
+    g.add_argument("--group-size", type=int, default=25,
+                   help="clips cross-faded per pass; group borders are hard cuts. 0 cross-fades everything in one pass -- no hard cuts, but heavy (default: 25)")
+    g.add_argument("--supersample", type=int, default=2, help="Ken Burns oversampling (default: 2)")
+    g.add_argument("--cache", type=Path, help="working folder (default: next to the output)")
+    g.add_argument("--keep-cache", action="store_true", help="do not delete the working folder")
+    g.add_argument("--clean", action="store_true", help="empty the working folder before starting")
+    return p.parse_args(argv)
+
+
+def find_font(explicit: str | None) -> str | None:
+    if explicit:
+        return explicit if Path(explicit).exists() else None
+    if have("fc-match"):
+        cp = run(["fc-match", "-f", "%{file}", "DejaVu Sans"], check=False)
+        if cp.returncode == 0 and cp.stdout.strip() and Path(cp.stdout.strip()).exists():
+            return cp.stdout.strip()
+    for guess in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                  "/usr/share/fonts/TTF/DejaVuSans.ttf",
+                  "/System/Library/Fonts/Helvetica.ttc",
+                  "/Library/Fonts/Arial.ttf",
+                  "C:/Windows/Fonts/arial.ttf"):
+        if Path(guess).exists():
+            return guess
+    return None
+
+
+def main(argv: list[str]) -> int:
+    cfg = parse_args(argv)
+    for tool in ("ffmpeg", "ffprobe"):
+        if not have(tool):
+            die(f"{tool} not found -- see setup/install-video-deps.sh")
+
+    if cfg.size in PRESET_SIZES:
+        cfg.width, cfg.height = PRESET_SIZES[cfg.size]
+    else:
+        m = re.fullmatch(r"(\d+)x(\d+)", cfg.size)
+        if not m:
+            die(f"unknown --size {cfg.size!r}")
+        cfg.width, cfg.height = int(m.group(1)), int(m.group(2))
+    cfg.width -= cfg.width % 2
+    cfg.height -= cfg.height % 2
+    if cfg.photo_duration <= cfg.transition:
+        die("--photo-duration must be longer than --transition")
+
+    cfg.output = cfg.output.expanduser().resolve()
+    cfg.cache = (cfg.cache or cfg.output.parent / (cfg.output.stem + ".cache")).expanduser().resolve()
+    if cfg.clean and cfg.cache.exists():
+        shutil.rmtree(cfg.cache)
+    cfg.cache.mkdir(parents=True, exist_ok=True)
+    cfg.font = find_font(cfg.font)
+    cfg.ffmpeg_reads_heic = False
+
+    say("Scanning ...")
+    paths = gather([p.expanduser() for p in cfg.input], cfg.recursive)
+    if not paths:
+        die("found no photos or videos (try -r to search subfolders)")
+    items = describe(paths, cfg.jobs)
+    say(f"Found {len(items)} files "
+        f"({sum(1 for i in items if i.kind == 'photo')} photos, "
+        f"{sum(1 for i in items if i.kind == 'video')} videos).")
+    undated = sum(1 for i in items if not i.dated)
+    if undated:
+        say(f"  {undated} without a capture date -- ordered by file date instead.")
+
+    if cfg.photos_only:
+        items = [i for i in items if i.kind == "photo"]
+    if cfg.videos_only:
+        items = [i for i in items if i.kind == "video"]
+    if cfg.since:
+        items = [i for i in items if i.taken >= cfg.since]
+    if cfg.until:
+        items = [i for i in items if i.taken <= cfg.until]
+    if not items:
+        die("nothing left after filtering")
+
+    if cfg.order == "name":
+        items.sort(key=lambda i: str(i.path).lower())
+    elif cfg.order == "shuffle":
+        random.Random(cfg.seed).shuffle(items)
+    else:
+        items.sort(key=lambda i: (i.taken, str(i.path).lower()))
+
+    items = lay_out(items, cfg)
+    if not items:
+        die("nothing left to show")
+    items = pick(items, cfg)
+
+    heic = [i for i in items if i.path.suffix.lower() in {".heic", ".heif"}]
+    if heic:
+        probe_cmd = FFMPEG[:-1] + ["-i", str(heic[0].path), "-frames:v", "1", "-f", "null", "-"]
+        cfg.ffmpeg_reads_heic = run(probe_cmd, check=False).returncode == 0
+        if not cfg.ffmpeg_reads_heic:
+            say(f"  {len(heic)} HEIC files -- converting them to JPEG first.")
+
+    cards = 0
+    if cfg.title:
+        if cfg.font:
+            items.insert(0, Item(path=Path("title"), kind="card", taken=items[0].taken,
+                                 duration=max(cfg.card_duration, cfg.transition + 0.25),
+                                 text=cfg.title))
+            cards += 1
+        else:
+            say("  no usable font found -- skipping the title card.")
+    if cfg.end_title and cfg.font:
+        items.append(Item(path=Path("end"), kind="card", taken=items[-1].taken,
+                          duration=max(cfg.card_duration, cfg.transition + 0.25),
+                          text=cfg.end_title))
+        cards += 1
+
+    rng = random.Random(cfg.seed)
+    cfg.motions = list(MOTIONS)
+    rng.shuffle(cfg.motions)
+
+    groups = group_count(len(items), cfg)
+    say(f"Timeline: {len(items)} clips, about {hms(timeline_length(items, cfg))} "
+        f"at {cfg.width}x{cfg.height}@{cfg.fps}.")
+    if groups > 1:
+        say(f"  {groups} cross-fade groups -- {groups - 1} group borders are hard cuts "
+            f"(--group-size 0 for none).")
+
+    if cfg.plan:
+        print()
+        size = cfg.group_size if cfg.group_size > 0 else max(1, len(items))
+        clock = 0.0
+        for n, item in enumerate(items, 1):
+            when = item.taken.strftime("%Y-%m-%d %H:%M") if item.kind != "card" else "-"
+            name = item.text if item.kind == "card" else item.path.name
+            print(f"{n:5d}  {hms(clock):>8}  {item.duration:5.1f}s  {item.kind:<5}  {when}  {name}")
+            same_group = n < len(items) and n % size != 0
+            clock += item.duration - (cfg.transition if same_group else 0)
+        print()
+        say(f"Total {hms(clock)}. Drop --plan to render.")
+        return 0
+
+    say(f"Rendering {len(items)} clips with {cfg.jobs} workers ...")
+    done = [0]
+    started = time.monotonic()
+
+    def work(pair):
+        index, item = pair
+        path = render_segment(item, cfg, index)
+        with _print_lock:
+            done[0] += 1
+            step = 10 if len(items) < 200 else 25
+            if done[0] % step == 0 or done[0] == len(items):
+                spent = time.monotonic() - started
+                left = spent / done[0] * (len(items) - done[0])
+                eta = f", about {hms(left)} left" if done[0] < len(items) else ""
+                print(f"  {done[0]}/{len(items)} clips{eta}", flush=True)
+        return index, path
+
+    segments: list[Path] = [Path()] * len(items)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=cfg.jobs) as pool:
+        for index, path in pool.map(work, list(enumerate(items))):
+            segments[index] = path
+
+    durations = [actual_duration(p) for p in segments]
+
+    size = cfg.group_size if cfg.group_size > 0 else max(1, len(segments))
+    groups = [(segments[i:i + size], durations[i:i + size])
+              for i in range(0, len(segments), size)]
+    say(f"Cross-fading in {len(groups)} group(s) ...")
+    group_files: list[Path] = []
+    for n, (paths, durs) in enumerate(groups):
+        key = hashlib.sha1(json.dumps(
+            [[p.name for p in paths], [round(d, 3) for d in durs], cfg.transition,
+             cfg.transition_name, cfg.crf, cfg.preset, cfg.fps, cfg.width, cfg.height],
+            sort_keys=True).encode()).hexdigest()[:16]
+        out = cfg.cache / f"group-{n:04d}-{key}.mkv"
+        if not (out.exists() and out.stat().st_size > 0):
+            join_group(paths, durs, out, cfg, cfg.crf, cfg.preset)
+        group_files.append(out)
+        say(f"  group {n + 1}/{len(groups)}")
+
+    joined = cfg.cache / "joined.mkv"
+    joined.unlink(missing_ok=True)
+    if len(group_files) == 1:
+        shutil.copyfile(group_files[0], joined)
+    else:
+        concat_copy(group_files, joined)
+
+    music = build_music_bed(cfg.music, cfg) if cfg.music else None
+    say("Writing the final file ...")
+    cfg.output.parent.mkdir(parents=True, exist_ok=True)
+    finish(joined, music, cfg.output, cfg)
+
+    if not cfg.keep_cache:
+        shutil.rmtree(cfg.cache, ignore_errors=True)
+
+    size_mb = cfg.output.stat().st_size / 1e6
+    say(f"Done: {cfg.output} -- {hms(actual_duration(cfg.output))}, {size_mb:.0f} MB")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main(sys.argv[1:]))
+    except KeyboardInterrupt:
+        sys.stderr.write("\ninterrupted\n")
+        raise SystemExit(130)
+    except RuntimeError as exc:
+        die(str(exc))
