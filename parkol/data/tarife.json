@@ -1,0 +1,356 @@
+{
+  "_hinweise": [
+    "Diese Datei steuert alle Preise und Regeln in ParkOL. Sie darf von Hand bearbeitet werden (siehe README.md, Abschnitt 'tarife.json pflegen').",
+    "Jeder Eintrag hat 'quelle' (woher die Angabe stammt) und 'verifiziert' (true = aus amtlicher/Betreiber-Quelle belegt, false = unbestätigt). Unbestätigte Angaben zeigt die App mit dem Hinweis 'unbestätigt' an.",
+    "Wochentage: Mo, Di, Mi, Do, Fr, Sa, So. 'Fe' = gesetzlicher Feiertag in Niedersachsen. Uhrzeiten im Format HH:MM, 'bis' ist exklusiv (19:00 heißt: ab 19:00 Uhr kostenlos). '24:00' ist erlaubt.",
+    "Koordinaten in 'gebiet.punkte' sind [Breite, Länge] (lat, lon), wie man sie z. B. aus openstreetmap.org kopiert."
+  ],
+  "stand": "2026-09-25",
+  "waehrung": "EUR",
+
+  "feiertage": {
+    "bundesland": "Niedersachsen",
+    "liste": ["neujahr", "karfreitag", "ostermontag", "tag_der_arbeit", "christi_himmelfahrt", "pfingstmontag", "tag_der_deutschen_einheit", "reformationstag", "erster_weihnachtstag", "zweiter_weihnachtstag"],
+    "quelle": "Niedersächsisches Gesetz über die Feiertage (NFeiertagsG), § 2",
+    "verifiziert": true
+  },
+
+  "zonen": [
+    {
+      "id": "I",
+      "name": "Zone I – Innenstadt",
+      "preis": {
+        "takt_minuten": 15,
+        "preis_pro_takt": 0.70,
+        "text": "2,80 € pro Stunde, abgerechnet je angefangene Viertelstunde (0,70 €)",
+        "quelle": "Stadt Oldenburg, Pressemitteilung 'Parkgebühren: Rat tritt auf die Bremse' (26.11.2024) und Seite 'Parken' (abgerufen 25.09.2026): Erhöhung ab 2025 ausgesetzt, Zone I weiterhin 2,80 €/h. Grundlage: Parkgebührenordnung 3.51 § 1, Stufe ab 01.01.2024.",
+        "url": "https://www.oldenburg.de/startseite/stadtraum/verkehr-mobilitaet/parken.html",
+        "verifiziert": true
+      },
+      "zeiten": {
+        "gebuehrenpflichtig": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa"], "von": "08:00", "bis": "19:00" }
+        ],
+        "feiertage_frei": true,
+        "text": "werktags (Mo–Sa) 8–19 Uhr; sonntags und feiertags kostenlos",
+        "quelle": "Stadt Oldenburg, Seite 'Parken': 'In Oldenburg ist das Parken werktags von 8 bis 19 Uhr auf städtischen Parkflächen gebührenpflichtig.' 'Werktags' umfasst im Straßenverkehrsrecht Montag bis Samstag. Die Beschilderung vor Ort ist maßgeblich.",
+        "url": "https://www.oldenburg.de/startseite/stadtraum/verkehr-mobilitaet/parken.html",
+        "verifiziert": true
+      },
+      "hoechstparkdauer": {
+        "minuten": null,
+        "text": "keine allgemeine Regel bekannt – siehe Beschilderung/Parkscheinautomat",
+        "quelle": "Parkgebührenordnung enthält keine Höchstparkdauer; einzelne Straßen können eine Höchstparkdauer haben (wird aus OSM übernommen, falls eingetragen).",
+        "verifiziert": false
+      },
+      "gebiet": {
+        "punkte": [
+          [53.1476, 8.2072], [53.1447, 8.2072], [53.1447, 8.2034], [53.1428, 8.2034],
+          [53.1416, 8.2063], [53.1387, 8.2062], [53.1354, 8.2106], [53.1364, 8.2124],
+          [53.1377, 8.2137], [53.1364, 8.2174], [53.1316, 8.2116], [53.1317, 8.2140],
+          [53.1330, 8.2198], [53.1394, 8.2256], [53.1401, 8.2312], [53.1426, 8.2312],
+          [53.1437, 8.2241], [53.1443, 8.2210], [53.1454, 8.2186], [53.1461, 8.2162],
+          [53.1477, 8.2166]
+        ],
+        "puffer_meter": 25,
+        "text": "umschlossen von Peterstraße (inkl. Parkplatz Katharinenstraße), Herbartstraße bis Bismarckstraße, Bismarckstraße, Gartenstraße, Schloßwall, Elisabethstraße, Schleusenstraße, Kanalstraße, Staupromenade, Stau bis Bahnübergang, Alter Stadthafen, Bahnhofsvorplatz, Moslestraße, Bundesbahnweg, Donnerschweer Straße, Pferdemarkt – jeweils einschließlich dieser Straßen",
+        "quelle": "Straßenliste aus Parkgebührenordnung 3.51 § 1 (Stadt Oldenburg). Das Polygon ist eine eigene Näherung anhand der OSM-Straßengeometrien, NICHT der amtliche Lageplan.",
+        "url": "https://www.oldenburg.de/fileadmin/oldenburg/Benutzer/Dateien/22_Rechtsamt/3.51-20230901_K_b.pdf",
+        "verifiziert": false
+      }
+    },
+    {
+      "id": "III",
+      "name": "Zone III – Messestraße (Weser-Ems-Halle)",
+      "preis": {
+        "takt_minuten": 15,
+        "preis_pro_takt": 0.40,
+        "tageshoechstsatz": 4.00,
+        "text": "1,60 € pro Stunde (0,40 € je angefangene Viertelstunde), höchstens 4,00 € pro Tag",
+        "quelle": "Parkgebührenordnung 3.51 § 1, Stufe ab 01.01.2024. Dass die Aussetzung der Erhöhung auch für Zone III gilt, ist nicht ausdrücklich belegt (Pressemitteilung nennt nur Zone I und II).",
+        "url": "https://www.oldenburg.de/fileadmin/oldenburg/Benutzer/Dateien/22_Rechtsamt/3.51-20230901_K_b.pdf",
+        "verifiziert": false
+      },
+      "zeiten": {
+        "gebuehrenpflichtig": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa"], "von": "08:00", "bis": "19:00" }
+        ],
+        "feiertage_frei": true,
+        "text": "werktags (Mo–Sa) 8–19 Uhr",
+        "quelle": "Stadt Oldenburg, Seite 'Parken' (allgemeine Aussage für städtische Parkflächen). Bei Veranstaltungen können abweichende Regeln gelten.",
+        "url": "https://www.oldenburg.de/startseite/stadtraum/verkehr-mobilitaet/parken.html",
+        "verifiziert": false
+      },
+      "hoechstparkdauer": {
+        "minuten": null,
+        "text": "unbekannt",
+        "quelle": "keine Angabe gefunden",
+        "verifiziert": false
+      },
+      "gebiet": {
+        "punkte": [
+          [53.1515, 8.2230], [53.1515, 8.2400], [53.1465, 8.2400], [53.1465, 8.2230]
+        ],
+        "puffer_meter": 0,
+        "text": "Stellplätze an der Messestraße (Weser-Ems-Halle)",
+        "quelle": "Parkgebührenordnung 3.51 § 1; Rechteck ist eine eigene Näherung.",
+        "url": "https://www.oldenburg.de/fileadmin/oldenburg/Benutzer/Dateien/22_Rechtsamt/3.51-20230901_K_b.pdf",
+        "verifiziert": false
+      }
+    },
+    {
+      "id": "II",
+      "name": "Zone II – übriges Stadtgebiet",
+      "preis": {
+        "takt_minuten": 15,
+        "preis_pro_takt": 0.40,
+        "text": "1,60 € pro Stunde, abgerechnet je angefangene Viertelstunde (0,40 €)",
+        "quelle": "Stadt Oldenburg, Pressemitteilung 'Parkgebühren: Rat tritt auf die Bremse' (26.11.2024) und Seite 'Parken' (abgerufen 25.09.2026): Zone II 1,60 €/h.",
+        "url": "https://www.oldenburg.de/startseite/stadtraum/verkehr-mobilitaet/parken.html",
+        "verifiziert": true
+      },
+      "zeiten": {
+        "gebuehrenpflichtig": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa"], "von": "08:00", "bis": "19:00" }
+        ],
+        "feiertage_frei": true,
+        "text": "werktags (Mo–Sa) 8–19 Uhr; sonntags und feiertags kostenlos",
+        "quelle": "Stadt Oldenburg, Seite 'Parken'. Beschilderung vor Ort ist maßgeblich.",
+        "url": "https://www.oldenburg.de/startseite/stadtraum/verkehr-mobilitaet/parken.html",
+        "verifiziert": true
+      },
+      "hoechstparkdauer": {
+        "minuten": null,
+        "text": "keine allgemeine Regel bekannt – siehe Beschilderung",
+        "quelle": "keine Angabe in der Parkgebührenordnung",
+        "verifiziert": false
+      },
+      "gebiet": {
+        "rest": true,
+        "text": "gesamtes Stadtgebiet außerhalb der Zonen I und III",
+        "quelle": "Parkgebührenordnung 3.51 § 1",
+        "verifiziert": true
+      }
+    }
+  ],
+
+  "parkhaeuser": [
+    {
+      "id": "waffenplatz",
+      "name": "Parkhaus Am Waffenplatz",
+      "osm_ids": ["way/30251488"],
+      "live_name": "Parkhaus Am Waffenplatz",
+      "betreiber": "Contipark",
+      "oeffnungszeiten": "24/7",
+      "tarif": {
+        "perioden": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], "von": "00:00", "bis": "24:00", "takt_minuten": 60, "preis_pro_takt": 2.20 }
+        ],
+        "tageshoechstsatz": 15.00,
+        "text": "2,20 € je angefangene Stunde, max. 15,00 € / 24 h (mit Pcard 2,00 €/h, max. 8,00 €)"
+      },
+      "quelle": "contipark.de, Parkhaus Am Waffenplatz (abgerufen 25.09.2026)",
+      "url": "https://www.contipark.de/de/parken/oldenburg/parkhaus-am-waffenplatz/",
+      "verifiziert": true
+    },
+    {
+      "id": "staulinie",
+      "name": "Parkhaus Staulinie",
+      "osm_ids": ["way/33786466"],
+      "live_name": null,
+      "betreiber": "Contipark",
+      "oeffnungszeiten": "24/7 (Rolltore ab 20 Uhr geschlossen, öffnen automatisch)",
+      "tarif": {
+        "perioden": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], "von": "00:00", "bis": "24:00", "takt_minuten": 60, "preis_pro_takt": 1.50 }
+        ],
+        "tageshoechstsatz": 8.00,
+        "text": "1,50 € je angefangene Stunde, max. 8,00 € pro Tag (mit Pcard 1,00 €/h, max. 4,00 €)"
+      },
+      "quelle": "contipark.de, Parkhaus Staulinie (abgerufen 25.09.2026)",
+      "url": "https://www.contipark.de/de/parken/oldenburg/parkhaus-staulinie/",
+      "verifiziert": true
+    },
+    {
+      "id": "schlosshoefe",
+      "name": "Parkhaus Schlosshöfe",
+      "osm_ids": ["node/1200301854"],
+      "live_name": "Parkhaus Schlosshöfe",
+      "betreiber": "Schlosshöfe Oldenburg (ECE)",
+      "oeffnungszeiten": "24/7",
+      "tarif": {
+        "perioden": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], "von": "00:00", "bis": "24:00", "takt_minuten": 60, "preis_pro_takt": 2.50, "preis_pro_takt_min": 1.50 }
+        ],
+        "tageshoechstsatz": 10.00,
+        "text": "1,50 € bis 2,50 € je angefangene Stunde (dynamisch, Anzeige bei Einfahrt gilt), Tagesmaximum 10,00 €"
+      },
+      "quelle": "schlosshoefe-oldenburg.de, Anfahrt & Parken (abgerufen 25.09.2026)",
+      "url": "https://www.schlosshoefe-oldenburg.de/service/anfahrt-parken/parken/",
+      "verifiziert": true
+    },
+    {
+      "id": "theatergarage",
+      "name": "Tiefgarage Theatergarage",
+      "osm_ids": ["node/13998609509"],
+      "live_name": "Parkhaus Theatergarage",
+      "betreiber": "APCOA",
+      "oeffnungszeiten": null,
+      "tarif": {
+        "perioden": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], "von": "00:00", "bis": "24:00", "takt_minuten": 60, "preis_pro_takt": 3.50 }
+        ],
+        "tageshoechstsatz": 30.00,
+        "text": "ab 3,50 € je angefangene Stunde, Tagesmax. 30,00 € (mit App 'APCOA FLOW' 1,99 €/h, max. 14,99 €)"
+      },
+      "quelle": "apcoa.de, Standort Theatergarage (abgerufen 25.09.2026)",
+      "url": "https://www.apcoa.de/einmal-parken/standorte/oldenburg/theatergarage",
+      "verifiziert": true
+    },
+    {
+      "id": "august-carree",
+      "name": "Parkhaus August Carrée",
+      "osm_ids": ["way/1321479874"],
+      "live_name": "Parkhaus August Carrée",
+      "betreiber": "August Carrée",
+      "oeffnungszeiten": "24/7",
+      "tarif": {
+        "perioden": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa"], "von": "06:00", "bis": "20:00", "erste_stunde": 3.00, "takt_minuten": 60, "preis_pro_takt": 2.00 },
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So", "Fe"], "von": "20:00", "bis": "24:00", "takt_minuten": 60, "preis_pro_takt": 1.50 },
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So", "Fe"], "von": "00:00", "bis": "06:00", "takt_minuten": 60, "preis_pro_takt": 1.50 },
+          { "tage": ["So", "Fe"], "von": "07:00", "bis": "20:00", "takt_minuten": 60, "preis_pro_takt": 1.50, "max": 7.00 },
+          { "tage": ["So", "Fe"], "von": "06:00", "bis": "07:00", "takt_minuten": 60, "preis_pro_takt": 1.50 }
+        ],
+        "tageshoechstsatz": 18.00,
+        "text": "Mo–Sa 6–20 Uhr: erste Stunde 3,00 €, jede weitere angefangene 2,00 €; Nacht 20–6 Uhr: 1,50 €/h; So/Feiertag 7–20 Uhr: 1,50 €/h, max. 7,00 €; Tageshöchstsatz 18,00 €"
+      },
+      "quelle": "augustcarree.de/parkhaus (abgerufen 25.09.2026). So/Feiertag 6–7 Uhr ist dort nicht ausdrücklich geregelt; hier als Nachttarif angenommen.",
+      "url": "https://augustcarree.de/parkhaus/",
+      "verifiziert": true
+    },
+    {
+      "id": "heiligengeist-hoefe",
+      "name": "Parkhaus Heiligengeist-Höfe",
+      "osm_ids": ["node/2777023962"],
+      "live_name": "Parkhaus Heiligengeist-Höfe",
+      "betreiber": null,
+      "oeffnungszeiten": "24/7",
+      "tarif": {
+        "perioden": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa"], "von": "06:00", "bis": "22:00", "erste_stunde": 2.00, "takt_minuten": 30, "preis_pro_takt": 1.00 },
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa"], "von": "22:00", "bis": "24:00", "erste_stunde": 2.00, "takt_minuten": 30, "preis_pro_takt": 0.50 },
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa"], "von": "00:00", "bis": "06:00", "erste_stunde": 2.00, "takt_minuten": 30, "preis_pro_takt": 0.50 },
+          { "tage": ["So"], "von": "00:00", "bis": "24:00", "erste_stunde": 2.00, "takt_minuten": 30, "preis_pro_takt": 0.50 }
+        ],
+        "tageshoechstsatz": null,
+        "text": "Mo–Sa 6–22 Uhr: erste Stunde 2,00 €, danach 1,00 € je 30 Min.; nachts und sonntags: erste Stunde 2,00 €, danach 0,50 € je 30 Min."
+      },
+      "quelle": "parkinglist.de (Drittanbieter, Aktualität unbekannt) – nicht beim Betreiber bestätigt",
+      "url": "https://www.parkinglist.de/parkplatz/oldenburg/parkhaus-heiligengeist-hoefe-oldenburg-3928",
+      "verifiziert": false
+    },
+    {
+      "id": "galeria",
+      "name": "Parkhaus Galeria (Kaufhof)",
+      "osm_ids": ["way/34584899"],
+      "live_name": "Parkhaus Galeria Kaufhof",
+      "betreiber": null,
+      "oeffnungszeiten": null,
+      "tarif": {
+        "perioden": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], "von": "00:00", "bis": "24:00", "takt_minuten": 60, "preis_pro_takt": 1.50 }
+        ],
+        "tageshoechstsatz": null,
+        "text": "ca. 1,50 € pro Stunde (Kundentarife möglich)"
+      },
+      "quelle": "Drittanbieter-Verzeichnis (parkinglist.de) laut Websuche – nicht beim Betreiber bestätigt, Stand unbekannt",
+      "url": "https://www.parkinglist.de/parkplatz/Oldenburg/parkhaus-galeria-kaufhof-oldenburg-3930",
+      "verifiziert": false
+    },
+    {
+      "id": "zob",
+      "name": "P+R Parkhaus am ZOB / Hauptbahnhof Nord",
+      "osm_ids": ["way/278392669"],
+      "live_name": "Parkhaus Bahnhof / ZOB",
+      "betreiber": "Stadt Oldenburg",
+      "oeffnungszeiten": null,
+      "tarif": {
+        "perioden": [],
+        "tageshoechstsatz": 5.00,
+        "text": "Tagesmaximum 5,00 € (Stand laut NWZ; eine Erhöhung auf 8,00 € war geplant, Beschluss unbekannt). Stundentarif nicht belegt."
+      },
+      "quelle": "NWZ-Bericht 'Oldenburgs günstigstes Parkhaus soll teurer werden' – amtliche Tariftabelle nicht gefunden. Zuordnung zum Live-Eintrag 'Parkhaus Bahnhof / ZOB' ist eine Annahme.",
+      "url": "https://www.nwzonline.de/oldenburg/parken-am-zob-in-oldenburg-stadt-plant-deutliche-preiserhoehung_a_4,2,4048716046.html",
+      "verifiziert": false
+    },
+    {
+      "id": "stadthafen",
+      "name": "Parkhaus Alter Stadthafen / CinemaxX",
+      "osm_ids": ["way/542732587"],
+      "live_name": "Parkhaus Alter Stadthafen / Cinemaxx",
+      "betreiber": null,
+      "oeffnungszeiten": null,
+      "tarif": {
+        "perioden": [
+          { "tage": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"], "von": "00:00", "bis": "24:00", "takt_minuten": 60, "preis_pro_takt": 1.00 }
+        ],
+        "tageshoechstsatz": 5.00,
+        "text": "ca. 1,00 € pro Stunde, max. 5,00 € pro Tag (Kinogäste ermäßigt)"
+      },
+      "quelle": "Websuche/Drittanbieter-Angaben – nicht beim Betreiber bestätigt. Zuordnung OSM-Objekt ↔ Live-Eintrag ist eine Annahme.",
+      "url": null,
+      "verifiziert": false
+    },
+    {
+      "id": "pferdemarkt",
+      "name": "Parkplatz Pferdemarkt",
+      "osm_ids": ["way/279951614", "way/279951615"],
+      "live_name": "Parkplatz Pferdemarkt",
+      "betreiber": "Stadt Oldenburg",
+      "zone": "I",
+      "quelle": "Städtischer Parkplatz; laut Parkgebührenordnung ausdrücklich Teil der Zone I (Marktfläche ausgenommen). An Markttagen eingeschränkt.",
+      "url": "https://www.oldenburg.de/fileadmin/oldenburg/Benutzer/Dateien/22_Rechtsamt/3.51-20230901_K_b.pdf",
+      "verifiziert": true
+    },
+    {
+      "id": "theaterwall",
+      "name": "Parkplatz Theaterwall",
+      "osm_ids": ["way/23044499"],
+      "live_name": "Parkplatz Theaterwall",
+      "betreiber": "Stadt Oldenburg",
+      "zone": "I",
+      "quelle": "Lage innerhalb der Zone-I-Grenzen; Zuordnung zur Zone I nicht einzeln belegt.",
+      "url": null,
+      "verifiziert": false
+    },
+    {
+      "id": "city-center",
+      "name": "Parkdeck City Center Oldenburg",
+      "osm_ids": ["node/99243398"],
+      "live_name": null,
+      "betreiber": null,
+      "tarif": null,
+      "quelle": "Nur in OSM (kostenpflichtig, 500 Plätze). Tarif nicht recherchiert.",
+      "url": null,
+      "verifiziert": false
+    },
+    {
+      "id": "rosenstrasse",
+      "name": "Parkhaus Rosenstraße",
+      "osm_ids": ["way/32509591"],
+      "live_name": null,
+      "betreiber": "P-OL GmbH",
+      "tarif": null,
+      "quelle": "Nur in OSM (kostenpflichtig). Tarif nicht recherchiert.",
+      "url": null,
+      "verifiziert": false
+    }
+  ],
+
+  "live": {
+    "quelle": "Parkleitsystem der Stadt Oldenburg – https://oldenburg-service.de/pls.php (Aktualisierung laut Stadt alle 5 Minuten)",
+    "hinweis": "Die Seite liefert HTML ohne CORS-Freigabe. Ein GitHub-Actions-Job liest sie regelmäßig aus und legt data/live.json neben die App.",
+    "max_alter_minuten": 45
+  }
+}
