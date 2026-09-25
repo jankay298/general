@@ -1,0 +1,6 @@
+{
+ "status": "keine_daten",
+ "hinweis": "Platzhalter. Beim Deployment über GitHub Actions wird diese Datei durch aktuelle Daten des Parkleitsystems ersetzt (scripts/fetch-live.mjs).",
+ "stand": null,
+ "eintraege": []
+}

@@ -1,0 +1,81 @@
+# ParkOL: testen, bauen und auf GitHub Pages veröffentlichen.
+#
+# - Bei jedem Push auf den Standard-Branch (Änderungen unter parkol/): Tests + Deployment.
+# - Alle 15 Minuten (schedule): nur bauen, Live-Belegung abrufen, neu veröffentlichen.
+#   So bekommt die App aktuelle Parkhausdaten, ohne eigenen Server.
+# - Pull Requests: nur Tests.
+#
+# Einmalig nötig: Repository → Settings → Pages → "Build and deployment" → Source: "GitHub Actions".
+
+name: ParkOL
+
+on:
+  push:
+    paths: ['parkol/**', '.github/workflows/parkol-pages.yml']
+  pull_request:
+    paths: ['parkol/**', '.github/workflows/parkol-pages.yml']
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: parkol-pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: parkol
+
+jobs:
+  test:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: parkol/package-lock.json
+      - run: npm ci
+      - run: npx vitest run
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npx playwright test
+        env:
+          CI: 'true'
+
+  deploy:
+    needs: test
+    # läuft nach erfolgreichen Tests (Push auf Standard-Branch) oder zeitgesteuert ohne Tests
+    if: >-
+      always() &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      github.event_name != 'pull_request' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: parkol/package-lock.json
+      - run: npm ci --omit=optional
+      - run: npm run build
+      - name: Live-Belegung vom Parkleitsystem abrufen
+        run: node scripts/fetch-live.mjs dist/live.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: parkol/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

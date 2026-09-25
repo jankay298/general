@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>ParkOL – Parken in Oldenburg</title>
+    <meta name="description" content="Wo kann ich in der Oldenburger Innenstadt parken, was kostet es jetzt und wo ist es kostenlos?" />
+    <meta name="theme-color" content="#16325c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="ParkOL" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand" aria-label="ParkOL">
+          <img src="icons/favicon.svg" alt="" width="28" height="28" />
+          <span>ParkOL</span>
+        </div>
+        <form id="search" role="search" autocomplete="off">
+          <label class="sr-only" for="search-input">Ziel suchen</label>
+          <input id="search-input" type="search" inputmode="search" enterkeyhint="search" placeholder="Ziel suchen, z. B. Lappan" />
+          <button type="submit" class="btn" aria-label="Suchen">Suchen</button>
+        </form>
+        <button id="locate" class="btn btn-icon" type="button" aria-label="Mein Standort" title="Mein Standort">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <ul id="search-results" class="search-results" hidden></ul>
+      </header>
+
+      <main id="map" aria-label="Karte der Parkmöglichkeiten"></main>
+
+      <section id="panel" aria-label="Filter und Liste">
+        <button id="panel-toggle" class="panel-handle" type="button" aria-expanded="true" aria-controls="panel-body">
+          <span class="grip" aria-hidden="true"></span>
+          <span id="summary" class="summary">Lade Daten …</span>
+        </button>
+        <div id="panel-body">
+          <article id="detail" class="detail" hidden tabindex="-1" aria-live="polite"></article>
+
+          <div class="filters" role="radiogroup" aria-label="Filter">
+            <button type="button" role="radio" class="chip" data-filter="all" aria-checked="true">Alle</button>
+            <button type="button" role="radio" class="chip" data-filter="free" aria-checked="false"><i class="dot free"></i>Jetzt kostenlos</button>
+            <button type="button" role="radio" class="chip" data-filter="garage" aria-checked="false"><i class="dot garage"></i>Parkhäuser</button>
+            <button type="button" role="radio" class="chip" data-filter="street" aria-checked="false"><i class="dot paid"></i>Straße/Parkplatz</button>
+          </div>
+
+          <div class="timebar">
+            <div class="seg" role="radiogroup" aria-label="Zeitpunkt">
+              <button type="button" role="radio" id="mode-now" aria-checked="true">Jetzt</button>
+              <button type="button" role="radio" id="mode-plan" aria-checked="false">Planen</button>
+            </div>
+            <div id="plan-fields" class="plan-fields" hidden>
+              <label>Tag <select id="plan-day"></select></label>
+              <label>Uhrzeit <input id="plan-time" type="time" step="900" value="14:00" /></label>
+            </div>
+            <label class="duration">Dauer
+              <select id="duration">
+                <option value="30">30 Min.</option>
+                <option value="60" selected>1 Std.</option>
+                <option value="120">2 Std.</option>
+                <option value="180">3 Std.</option>
+                <option value="240">4 Std.</option>
+                <option value="480">8 Std.</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="toggle"><input id="show-customers" type="checkbox" /> Kundenparkplätze zeigen</label>
+
+          <div id="live-status" class="live-status" role="status"></div>
+
+          <h2 id="list-title" class="list-title">In der Nähe</h2>
+          <ol id="list" class="list"></ol>
+
+          <details class="legend" open>
+            <summary>Legende &amp; Hinweise</summary>
+            <ul>
+              <li><i class="dot free"></i> jetzt kostenlos</li>
+              <li><i class="dot paid"></i> jetzt kostenpflichtig</li>
+              <li><i class="dot garage"></i> Parkhaus (Zahl = freie Plätze, falls live verfügbar)</li>
+              <li><i class="dot unknown"></i> Regeln unbekannt</li>
+              <li><span class="badge warn">unbestätigt</span> Angabe nicht amtlich/beim Betreiber belegt</li>
+            </ul>
+            <p>Alle Angaben ohne Gewähr. Maßgeblich sind Beschilderung und Parkscheinautomat vor Ort.</p>
+            <p id="data-stand" class="muted"></p>
+          </details>
+        </div>
+      </section>
+      <div id="toast" class="toast" role="alert" hidden></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
