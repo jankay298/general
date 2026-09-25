@@ -74,6 +74,9 @@ jobs:
       - name: Live-Belegung vom Parkleitsystem abrufen
         run: node scripts/fetch-live.mjs dist/live.json
       - uses: actions/configure-pages@v5
+        with:
+          # versucht, GitHub Pages (Quelle: GitHub Actions) automatisch einzuschalten
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: parkol/dist
